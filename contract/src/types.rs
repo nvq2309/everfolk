@@ -162,6 +162,8 @@ pub struct Accomplishment {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Evidence {
     pub v: u8,
+    /// Hex seed the contract assigned at birth; ties evidence to one life on one deployment.
+    pub seed: String,
     pub life_id: String,
     pub account_id: AccountId,
     pub world_version: String,

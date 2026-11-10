@@ -3,7 +3,7 @@ use crate::shares::bps_of;
 use crate::{Contract, ContractExt};
 use near_contract_standards::non_fungible_token::events::NftTransfer;
 use near_sdk::json_types::U128;
-use near_sdk::{env, near, require, AccountId, NearToken, Promise};
+use near_sdk::{assert_one_yocto, env, near, require, AccountId, NearToken, Promise};
 
 #[near(serializers = [json, borsh])]
 #[derive(Clone, Debug, PartialEq)]
@@ -15,7 +15,10 @@ pub struct Listing {
 
 #[near]
 impl Contract {
+    /// Requires 1 yoctoNEAR so a function-call access key alone can't put a token up for sale.
+    #[payable]
     pub fn list(&mut self, token_id: String, price: U128) {
+        assert_one_yocto();
         let seller = self.assert_token_owner(&token_id);
         require!(price.0 > 0, "Price must be above zero");
         self.listings.insert(token_id.clone(), Listing { token_id, seller_id: seller, price });

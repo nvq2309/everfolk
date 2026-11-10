@@ -4,7 +4,14 @@ use crate::{Contract, ContractExt};
 use near_contract_standards::non_fungible_token::events::NftMint;
 use near_contract_standards::non_fungible_token::metadata::TokenMetadata;
 use near_sdk::json_types::U64;
-use near_sdk::{env, near, require, AccountId};
+use near_sdk::{env, near, require, AccountId, Gas};
+
+/// Most NPC tokens one category's draw pool holds; keeps `draw_npc` under its gas floor.
+pub const MAX_POOL: usize = 1000;
+/// Most draws, and separately most checkpoints, one life may record (the contract pays their storage).
+pub const MAX_RECORDS_PER_LIFE: usize = 128;
+/// Gas floor for a draw, above its most expensive branch, so a draw can't be retried by starving one outcome of gas.
+const MIN_DRAW_GAS: Gas = Gas::from_tgas(100);
 
 fn validate_hash(hash: &str) {
     require!(
@@ -70,6 +77,7 @@ impl Contract {
 
     /// Picks which NPC token (if any) touches this key decision. Retrying the same step returns the stored draw.
     pub fn draw_npc(&mut self, life_id: U64, step: u32, category: String, commands_hash: String) -> Draw {
+        require!(env::prepaid_gas() >= MIN_DRAW_GAS, "Attach at least 100 Tgas to draw");
         validate_hash(&commands_hash);
         require!(self.catalog.npc_actions.iter().any(|a| a.category == category), "Unknown category");
         let mut life = self.owned_alive_life(life_id.0);
@@ -78,6 +86,7 @@ impl Contract {
             return existing.clone();
         }
         assert_next_step(&life, step, &commands_hash);
+        require!(life.draws.len() < MAX_RECORDS_PER_LIFE, "This life has reached its draw limit");
         let draw = self.pick_npc(life_id.0, step, category, commands_hash);
         life.draws.push(draw.clone());
         self.lives.insert(life_id.0, life);
@@ -92,6 +101,7 @@ impl Contract {
         if life.checkpoints.iter().any(|c| c.step == step) {
             return;
         }
+        require!(life.checkpoints.len() < MAX_RECORDS_PER_LIFE, "This life has reached its checkpoint limit");
         life.checkpoints.push(Checkpoint { step, commands_hash });
         self.lives.insert(life_id.0, life);
     }
@@ -175,6 +185,9 @@ impl Contract {
             TokenKind::Npc => (&mut self.npc_pools, record.category.clone().expect("category")),
         };
         let mut members = pools.get(&key).cloned().unwrap_or_default();
+        if record.kind == TokenKind::Npc && members.len() >= MAX_POOL {
+            return; // Minted and tradable, but not drawable: keeps draws under their gas floor.
+        }
         members.push(token_id.to_string());
         pools.insert(key, members);
     }

@@ -35,6 +35,10 @@ The deploy script creates a missing contract account from the testnet faucet and
 
 ## Known limits
 
+- Gas floors: `mint_life` needs 150 Tgas and `draw_npc` 100 Tgas, so no outcome can be retried by starving its branch of gas.
+- Per life: at most 128 draws and 128 checkpoints. Per category: at most 1000 drawable NPCs (later ones are minted but not drawn).
+- Each mint's storage is paid from the treasury's share of the fee; mint panics if the fee can't cover it.
+- Evidence is bound to the life's on-chain seed, so it can't be replayed on another deployment.
 - Randomness comes from NEAR block randomness (validator VRF). Fine for testnet; a block producer could withhold a block.
 - External marketplaces receive NEP-199 payouts limited by `max_len_payout`; the source owners that don't fit go to treasury. The in-game market pays every source.
 - Gas: pools and source lists are vectors; the MVP caps sources at 64 per token.

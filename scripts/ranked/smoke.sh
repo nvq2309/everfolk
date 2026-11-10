@@ -24,18 +24,20 @@ faucet_account "$A"
 faucet_account "$B"
 
 call "$A" "$CONTRACT_ID" start_life "{\"world_version\":\"$WORLD_VERSION\"}"
-LIFE_ID="$(view "$CONTRACT_ID" active_life_of "{\"account_id\":\"$A\"}" | json_field '.life_id')"
+LIFE="$(view "$CONTRACT_ID" active_life_of "{\"account_id\":\"$A\"}")"
+LIFE_ID="$(printf '%s' "$LIFE" | json_field '.life_id')"
+LIFE_SEED="$(printf '%s' "$LIFE" | json_field '.seed')"
 echo "  life $LIFE_ID"
 call "$A" "$CONTRACT_ID" draw_npc "{\"life_id\":\"$LIFE_ID\",\"step\":0,\"category\":\"education\",\"commands_hash\":\"$EMPTY_HASH\"}"
 call "$A" "$CONTRACT_ID" checkpoint "{\"life_id\":\"$LIFE_ID\",\"step\":0,\"commands_hash\":\"$EMPTY_HASH\"}"
 
-SIGNED="$(node "$ROOT/scripts/ranked/smoke-signer.ts" sign "$KEY_FILE" "$LIFE_ID" "$A" euclid)"
+SIGNED="$(node "$ROOT/scripts/ranked/smoke-signer.ts" sign "$KEY_FILE" "$LIFE_ID" "$LIFE_SEED" "$A" euclid)"
 MINT_ARGS="$(node -e 'const s=JSON.parse(process.argv[1]);process.stdout.write(JSON.stringify({life_id:process.argv[2],evidence_json:s.evidence_json,signature:s.signature,npc_action_id:"letters.teach"}))' "$SIGNED" "$LIFE_ID")"
 call "$A" "$CONTRACT_ID" mint_life "$MINT_ARGS" '1 NEAR'
 TOKEN_ID="$(view "$CONTRACT_ID" nft_tokens_for_owner "{\"account_id\":\"$A\"}" | json_field '[0].token_id')"
 echo "  minted token $TOKEN_ID: $(view "$CONTRACT_ID" nft_token "{\"token_id\":\"$TOKEN_ID\"}" | json_field '.metadata.title')"
 
-call "$A" "$CONTRACT_ID" list "{\"token_id\":\"$TOKEN_ID\",\"price\":\"$HALF_NEAR\"}"
+call "$A" "$CONTRACT_ID" list "{\"token_id\":\"$TOKEN_ID\",\"price\":\"$HALF_NEAR\"}" '1 yoctoNEAR'
 call "$B" "$CONTRACT_ID" buy "{\"token_id\":\"$TOKEN_ID\"}" '0.5 NEAR'
 NEW_OWNER="$(view "$CONTRACT_ID" nft_token "{\"token_id\":\"$TOKEN_ID\"}" | json_field '.owner_id')"
 [ "$NEW_OWNER" = "$B" ] || { echo "✗ token owner is $NEW_OWNER, expected $B"; exit 1; }

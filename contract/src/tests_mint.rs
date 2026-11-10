@@ -50,8 +50,10 @@ fn two_figure_sources(c: &mut Contract) -> (u64, String, String) {
 fn mint_npc_happy_path() {
     let mut c = ready();
     let life = start(&mut c, ALICE);
-    let evidence = evidence_json(life, ALICE, &[], &[], "letters", 50);
+    let evidence = evidence_json(&seed_of(&c, life), life, ALICE, &[], &[], "letters", 50);
+    let before = near_sdk::env::storage_usage();
     let result = mint(&mut c, ALICE, life, &evidence, "letters.teach");
+    let locked = (near_sdk::env::storage_usage() - before) as u128 * near_sdk::env::storage_byte_cost().as_yoctonear();
     assert_eq!(result.kind, TokenKind::Npc);
     assert_eq!(result.figure_id, None);
     assert!(result.rarity <= 4);
@@ -59,7 +61,8 @@ fn mint_npc_happy_path() {
     assert_eq!(c.nft.owner_by_id.get(&result.token_id), Some(account(ALICE)));
     assert_eq!(c.get_life(U64(life)).unwrap().status, LifeStatus::Minted);
     assert_eq!(c.active_life_of(account(ALICE)), None);
-    assert_eq!(c.balance_of(account(TREASURY)), U128(NEAR), "with no sources the whole fee goes to treasury");
+    assert!(locked > 0);
+    assert_eq!(c.balance_of(account(TREASURY)), U128(NEAR - locked), "with no sources the fee minus locked storage goes to treasury");
 }
 
 #[test]
@@ -70,7 +73,7 @@ fn minted_token_carries_extra_and_reference() {
     p.evidence_base_url = "https://everfolk.test/api/ranked/evidence/".into();
     c.set_params(p);
     let life = start(&mut c, ALICE);
-    let evidence = evidence_json(life, ALICE, &[], &[], "letters", 50);
+    let evidence = evidence_json(&seed_of(&c, life), life, ALICE, &[], &[], "letters", 50);
     let result = mint(&mut c, ALICE, life, &evidence, "letters.lend-books");
     let meta = c.nft.token_metadata_by_id.as_ref().unwrap().get(&result.token_id).unwrap();
     let extra: TokenExtra = serde_json::from_str(meta.extra.as_deref().unwrap()).unwrap();
@@ -88,7 +91,7 @@ fn figure_drop_when_rate_10000() {
     let mut c = ready();
     set_drop(&mut c, 10_000);
     let life = start(&mut c, ALICE);
-    let evidence = evidence_json(life, ALICE, &[], &["euclid"], "letters", 50);
+    let evidence = evidence_json(&seed_of(&c, life), life, ALICE, &[], &["euclid"], "letters", 50);
     let result = mint(&mut c, ALICE, life, &evidence, "letters.teach");
     assert_eq!(result.kind, TokenKind::Figure);
     assert_eq!(result.figure_id.as_deref(), Some("euclid"));
@@ -102,7 +105,7 @@ fn no_figure_at_zero_drop_rate() {
     let mut c = ready();
     set_drop(&mut c, 0);
     let life = start(&mut c, ALICE);
-    let evidence = evidence_json(life, ALICE, &[], &["euclid"], "letters", 50);
+    let evidence = evidence_json(&seed_of(&c, life), life, ALICE, &[], &["euclid"], "letters", 50);
     assert_eq!(mint(&mut c, ALICE, life, &evidence, "letters.teach").kind, TokenKind::Npc);
 }
 
@@ -115,14 +118,14 @@ fn no_figure_when_supply_exhausted() {
     set_drop(&mut c, 10_000);
     seed_figure(&mut c, "euclid", 10, 2);
     let life = start(&mut c, ALICE);
-    let evidence = evidence_json(life, ALICE, &[], &["euclid"], "letters", 50);
+    let evidence = evidence_json(&seed_of(&c, life), life, ALICE, &[], &["euclid"], "letters", 50);
     assert_eq!(mint(&mut c, ALICE, life, &evidence, "letters.teach").kind, TokenKind::Npc);
 }
 
 fn affection_with_bonds(bonds: i64) -> u8 {
     let mut c = ready();
     let life = start(&mut c, ALICE);
-    let evidence = evidence_json(life, ALICE, &[], &[], "letters", bonds);
+    let evidence = evidence_json(&seed_of(&c, life), life, ALICE, &[], &[], "letters", bonds);
     mint(&mut c, ALICE, life, &evidence, "letters.teach").affection
 }
 
@@ -141,7 +144,7 @@ fn affection_is_at_least_1_for_very_weak_bonds() {
 fn double_mint_rejected() {
     let mut c = ready();
     let life = start(&mut c, ALICE);
-    let evidence = evidence_json(life, ALICE, &[], &[], "letters", 50);
+    let evidence = evidence_json(&seed_of(&c, life), life, ALICE, &[], &[], "letters", 50);
     mint(&mut c, ALICE, life, &evidence, "letters.teach");
     mint(&mut c, ALICE, life, &evidence, "letters.teach");
 }
@@ -151,7 +154,7 @@ fn double_mint_rejected() {
 fn mint_by_non_owner_rejected() {
     let mut c = ready();
     let life = start(&mut c, ALICE);
-    let evidence = evidence_json(life, ALICE, &[], &[], "letters", 50);
+    let evidence = evidence_json(&seed_of(&c, life), life, ALICE, &[], &[], "letters", 50);
     mint(&mut c, BOB, life, &evidence, "letters.teach");
 }
 
@@ -160,7 +163,7 @@ fn mint_by_non_owner_rejected() {
 fn evidence_for_another_account_rejected() {
     let mut c = ready();
     let life = start(&mut c, ALICE);
-    let evidence = evidence_json(life, BOB, &[], &[], "letters", 50);
+    let evidence = evidence_json(&seed_of(&c, life), life, BOB, &[], &[], "letters", 50);
     mint(&mut c, ALICE, life, &evidence, "letters.teach");
 }
 
@@ -169,7 +172,7 @@ fn evidence_for_another_account_rejected() {
 fn evidence_for_another_life_rejected() {
     let mut c = ready();
     let life = start(&mut c, ALICE);
-    let evidence = evidence_json(life + 1, ALICE, &[], &[], "letters", 50);
+    let evidence = evidence_json(&seed_of(&c, life), life + 1, ALICE, &[], &[], "letters", 50);
     mint(&mut c, ALICE, life, &evidence, "letters.teach");
 }
 
@@ -178,7 +181,7 @@ fn evidence_for_another_life_rejected() {
 fn bad_signature_rejected() {
     let mut c = ready();
     let life = start(&mut c, ALICE);
-    let evidence = evidence_json(life, ALICE, &[], &[], "letters", 50);
+    let evidence = evidence_json(&seed_of(&c, life), life, ALICE, &[], &[], "letters", 50);
     let forged = hex::encode(SigningKey::from_bytes(&[99; 32]).sign(evidence.as_bytes()).to_bytes());
     pay(ALICE, 1);
     c.mint_life(U64(life), evidence, forged, "letters.teach".into());
@@ -189,7 +192,7 @@ fn bad_signature_rejected() {
 fn tampered_evidence_rejected() {
     let mut c = ready();
     let life = start(&mut c, ALICE);
-    let evidence = evidence_json(life, ALICE, &[], &[], "letters", 50);
+    let evidence = evidence_json(&seed_of(&c, life), life, ALICE, &[], &[], "letters", 50);
     let signature = sign(&evidence);
     pay(ALICE, 1);
     c.mint_life(U64(life), evidence.replace("\"bonds\":50", "\"bonds\":99"), signature, "letters.teach".into());
@@ -201,7 +204,7 @@ fn unknown_source_rejected() {
     let mut c = ready();
     let stranger = seed_npc(&mut c, "letters", "education", "letters.teach", 10, 0);
     let life = start(&mut c, ALICE);
-    let evidence = evidence_json(life, ALICE, &src(&[(&stranger, 3)]), &[], "letters", 50);
+    let evidence = evidence_json(&seed_of(&c, life), life, ALICE, &src(&[(&stranger, 3)]), &[], "letters", 50);
     mint(&mut c, ALICE, life, &evidence, "letters.teach");
 }
 
@@ -210,7 +213,7 @@ fn unknown_source_rejected() {
 fn insufficient_deposit_rejected() {
     let mut c = ready();
     let life = start(&mut c, ALICE);
-    let evidence = evidence_json(life, ALICE, &[], &[], "letters", 50);
+    let evidence = evidence_json(&seed_of(&c, life), life, ALICE, &[], &[], "letters", 50);
     context(ALICE, START_MS, NearToken::from_millinear(999), [5; 32]);
     c.mint_life(U64(life), evidence.clone(), sign(&evidence), "letters.teach".into());
 }
@@ -220,7 +223,7 @@ fn insufficient_deposit_rejected() {
 fn npc_action_from_another_career_rejected() {
     let mut c = ready();
     let life = start(&mut c, ALICE);
-    let evidence = evidence_json(life, ALICE, &[], &[], "letters", 50);
+    let evidence = evidence_json(&seed_of(&c, life), life, ALICE, &[], &[], "letters", 50);
     mint(&mut c, ALICE, life, &evidence, "military.mentor");
 }
 
@@ -229,7 +232,7 @@ fn npc_action_from_another_career_rejected() {
 fn unknown_matched_figure_rejected() {
     let mut c = ready();
     let life = start(&mut c, ALICE);
-    let evidence = evidence_json(life, ALICE, &[], &["zeus"], "letters", 50);
+    let evidence = evidence_json(&seed_of(&c, life), life, ALICE, &[], &["zeus"], "letters", 50);
     mint(&mut c, ALICE, life, &evidence, "letters.teach");
 }
 
@@ -237,11 +240,13 @@ fn unknown_matched_figure_rejected() {
 fn fee_split_credits_sources_by_impact() {
     let mut c = ready();
     let (life, euclid, alexander) = two_figure_sources(&mut c);
-    let evidence = evidence_json(life, ALICE, &src(&[(&euclid, 45_000), (&alexander, 15_000)]), &[], "letters", 50);
+    let evidence = evidence_json(&seed_of(&c, life), life, ALICE, &src(&[(&euclid, 45_000), (&alexander, 15_000)]), &[], "letters", 50);
+    let before = near_sdk::env::storage_usage();
     let minted = mint(&mut c, ALICE, life, &evidence, "letters.teach");
+    let locked = (near_sdk::env::storage_usage() - before) as u128 * near_sdk::env::storage_byte_cost().as_yoctonear();
     assert_eq!(c.balance_of(account(CAROL)), U128(NEAR * 375 / 1000));
     assert_eq!(c.balance_of(account(BOB)), U128(NEAR * 125 / 1000));
-    assert_eq!(c.balance_of(account(TREASURY)), U128(NEAR / 2));
+    assert_eq!(c.balance_of(account(TREASURY)), U128(NEAR / 2 - locked), "storage is paid from the treasury's half");
     let shares = c.sources_of(minted.token_id.clone());
     assert_eq!(shares.iter().map(|s| (s.token_id.clone(), s.bps)).collect::<Vec<_>>(), vec![(euclid.clone(), 7500), (alexander, 2500)]);
     assert_eq!(c.children_of(euclid.clone(), 0, 10), vec![minted.token_id]);
@@ -254,7 +259,7 @@ fn credits_current_owner_after_transfer() {
     let (life, euclid, _) = two_figure_sources(&mut c);
     as_account(CAROL);
     c.nft.internal_transfer(&account(CAROL), &account(BOB), &euclid, None, None);
-    let evidence = evidence_json(life, ALICE, &src(&[(&euclid, 1)]), &[], "letters", 50);
+    let evidence = evidence_json(&seed_of(&c, life), life, ALICE, &src(&[(&euclid, 1)]), &[], "letters", 50);
     mint(&mut c, ALICE, life, &evidence, "letters.teach");
     assert_eq!(c.balance_of(account(BOB)), U128(NEAR / 2));
     assert_eq!(c.balance_of(account(CAROL)), U128(0));
@@ -264,7 +269,7 @@ fn credits_current_owner_after_transfer() {
 fn withdraw_zeroes_balance() {
     let mut c = ready();
     let (life, euclid, _) = two_figure_sources(&mut c);
-    let evidence = evidence_json(life, ALICE, &src(&[(&euclid, 1)]), &[], "letters", 50);
+    let evidence = evidence_json(&seed_of(&c, life), life, ALICE, &src(&[(&euclid, 1)]), &[], "letters", 50);
     mint(&mut c, ALICE, life, &evidence, "letters.teach");
     as_account(CAROL);
     c.withdraw().detach();
@@ -326,4 +331,52 @@ fn set_action_moves_npc_between_pools() {
     c.set_action(token.clone(), "letters.horoscope".into());
     assert!(!c.npc_pools.get("education").cloned().unwrap_or_default().contains(&token));
     assert!(c.npc_pools.get("fate").cloned().unwrap_or_default().contains(&token));
+}
+
+#[test]
+#[should_panic(expected = "Evidence was made for a different life seed")]
+fn evidence_with_another_seed_rejected() {
+    let mut c = ready();
+    let life = start(&mut c, ALICE);
+    let evidence = evidence_json(&"0".repeat(64), life, ALICE, &[], &[], "letters", 50);
+    mint(&mut c, ALICE, life, &evidence, "letters.teach");
+}
+
+#[test]
+#[should_panic(expected = "Attach at least 150 Tgas")]
+fn mint_with_too_little_gas_rejected() {
+    let mut c = ready();
+    let life = start(&mut c, ALICE);
+    let evidence = evidence_json(&seed_of(&c, life), life, ALICE, &[], &[], "letters", 50);
+    with_gas(ALICE, NearToken::from_near(1), 149);
+    c.mint_life(U64(life), evidence.clone(), sign(&evidence), "letters.teach".into());
+}
+
+#[test]
+#[should_panic(expected = "The mint fee does not cover this token's storage")]
+fn fee_too_small_for_storage_rejected() {
+    let mut c = ready();
+    as_account(OWNER);
+    let mut p = c.get_params();
+    p.mint_fee = U128(1_000);
+    c.set_params(p);
+    let life = start(&mut c, ALICE);
+    let evidence = evidence_json(&seed_of(&c, life), life, ALICE, &[], &[], "letters", 50);
+    pay(ALICE, 1);
+    c.mint_life(U64(life), evidence.clone(), sign(&evidence), "letters.teach".into());
+}
+
+#[test]
+fn npc_pool_is_capped() {
+    let mut c = ready();
+    for i in 0..crate::lives::MAX_POOL {
+        if i % 50 == 0 {
+            as_account(OWNER); // fresh mocked receipt: the mock caps logs (mint events) at 100 per call
+        }
+        seed_npc(&mut c, "letters", "education", "letters.teach", 1, 0);
+    }
+    let overflow = seed_npc(&mut c, "letters", "education", "letters.teach", 1, 0);
+    let pool = c.npc_pools.get("education").cloned().unwrap();
+    assert_eq!(pool.len(), crate::lives::MAX_POOL);
+    assert!(!pool.contains(&overflow), "tokens past the cap are minted but not drawable");
 }

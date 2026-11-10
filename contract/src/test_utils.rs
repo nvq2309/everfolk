@@ -41,6 +41,24 @@ pub fn context(caller: &str, ms: u64, deposit: NearToken, seed: [u8; 32]) {
     testing_env!(b.build());
 }
 
+/// Like `context`, with an explicit prepaid gas budget in Tgas.
+pub fn with_gas(caller: &str, deposit: NearToken, tgas: u64) {
+    let mut b = VMContextBuilder::new();
+    b.current_account_id(account(CONTRACT))
+        .predecessor_account_id(account(caller))
+        .signer_account_id(account(caller))
+        .block_timestamp(START_MS * 1_000_000)
+        .attached_deposit(deposit)
+        .account_balance(NearToken::from_near(1_000))
+        .prepaid_gas(near_sdk::Gas::from_tgas(tgas))
+        .random_seed([5; 32]);
+    testing_env!(b.build());
+}
+
+pub fn seed_of(c: &Contract, life_id: u64) -> String {
+    c.get_life(near_sdk::json_types::U64(life_id)).expect("life").seed
+}
+
 pub fn as_account(caller: &str) {
     context(caller, START_MS, NearToken::from_yoctonear(0), [5; 32]);
 }
@@ -105,9 +123,9 @@ pub fn test_metadata() -> TokenMetadata {
 }
 
 /// Evidence JSON as the verifier would produce it for `life_id`.
-pub fn evidence_json(life_id: u64, account_id: &str, sources: &[(String, u64)], matched: &[&str], group: &str, bonds: i64) -> String {
+pub fn evidence_json(seed: &str, life_id: u64, account_id: &str, sources: &[(String, u64)], matched: &[&str], group: &str, bonds: i64) -> String {
     json!({
-        "v": 1, "life_id": life_id.to_string(), "account_id": account_id, "world_version": "alexandria-ranked-1",
+        "v": 1, "seed": seed, "life_id": life_id.to_string(), "account_id": account_id, "world_version": "alexandria-ranked-1",
         "world_fingerprint": "f".repeat(64), "save_hash": "a".repeat(64),
         "stats": { "health": 40, "knowledge": 70, "wealth": 20, "bonds": bonds },
         "skills": { "literacy": 80 }, "origin_id": "clerk-household", "peak_job_id": "copyist",

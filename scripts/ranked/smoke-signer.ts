@@ -1,6 +1,6 @@
 // Test-only life verifier for the testnet smoke run. The real verifier is server/ranked (lane E).
 // CLI: node scripts/ranked/smoke-signer.ts keygen <pem-file>
-//      node scripts/ranked/smoke-signer.ts sign <pem-file> <life_id> <account_id> [matched_figure ...]
+//      node scripts/ranked/smoke-signer.ts sign <pem-file> <life_id> <seed_hex> <account_id> [matched_figure ...]
 import { createPrivateKey, generateKeyPairSync, sign, type KeyObject } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
 import { RANKED_WORLD_VERSION } from "../../chain/ids.ts";
@@ -36,9 +36,9 @@ export function signEvidence(key: KeyObject, evidenceJson: string): { evidence_j
 }
 
 /** Plausible finished-life evidence with no sources, for exercising mint on testnet. */
-export function smokeEvidence(input: { lifeId: string; accountId: string; matchedFigures: string[] }): string {
+export function smokeEvidence(input: { lifeId: string; seed: string; accountId: string; matchedFigures: string[] }): string {
   return canonicalJson({
-    v: 1, life_id: input.lifeId, account_id: input.accountId, world_version: RANKED_WORLD_VERSION,
+    v: 1, seed: input.seed, life_id: input.lifeId, account_id: input.accountId, world_version: RANKED_WORLD_VERSION,
     world_fingerprint: "0".repeat(64), save_hash: "0".repeat(64),
     stats: { health: 40, knowledge: 80, wealth: 30, bonds: 60 }, skills: { literacy: 90, reckoning: 85 },
     origin_id: "clerk-household", peak_job_id: "copyist", accomplishments: [], death_age: 63,
@@ -47,19 +47,19 @@ export function smokeEvidence(input: { lifeId: string; accountId: string; matche
 }
 
 function main(argv: string[]): void {
-  const [command, file, lifeId, accountId, ...figures] = argv;
+  const [command, file, lifeId, seed, accountId, ...figures] = argv;
   if (command === "keygen" && file) {
     const key = newSigningKey();
     writeFileSync(file, key.export({ format: "pem", type: "pkcs8" }), { mode: 0o600 });
     process.stdout.write(nearPublicKey(key));
     return;
   }
-  if (command === "sign" && file && lifeId && accountId) {
+  if (command === "sign" && file && lifeId && seed && accountId) {
     const key = createPrivateKey(readFileSync(file));
-    process.stdout.write(JSON.stringify(signEvidence(key, smokeEvidence({ lifeId, accountId, matchedFigures: figures }))));
+    process.stdout.write(JSON.stringify(signEvidence(key, smokeEvidence({ lifeId, seed, accountId, matchedFigures: figures }))));
     return;
   }
-  throw new Error("Usage: smoke-signer.ts keygen <pem> | sign <pem> <life_id> <account_id> [figure ...]");
+  throw new Error("Usage: smoke-signer.ts keygen <pem> | sign <pem> <life_id> <seed_hex> <account_id> [figure ...]");
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) main(process.argv.slice(2));

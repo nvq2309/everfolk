@@ -24,7 +24,7 @@ fn listed_child(c: &mut Contract, price: u128) -> (String, String, String) {
     }
     let child = seed_npc(c, "letters", "education", "letters.teach", 10, 0);
     c.sources.insert(child.clone(), vec![Share { token_id: bob_src.clone(), bps: 7500 }, Share { token_id: alice_src.clone(), bps: 2500 }]);
-    as_account(CAROL);
+    context(CAROL, START_MS, NearToken::from_yoctonear(1), [5; 32]);
     c.list(child.clone(), U128(price));
     (child, bob_src, alice_src)
 }
@@ -95,7 +95,7 @@ fn transfer_clears_listing() {
 fn list_by_non_owner_rejected() {
     let mut c = market();
     let token = seed_npc(&mut c, "letters", "education", "letters.teach", 10, 0);
-    as_account(BOB);
+    context(BOB, START_MS, NearToken::from_yoctonear(1), [5; 32]);
     c.list(token, U128(NEAR));
 }
 
@@ -104,7 +104,7 @@ fn list_by_non_owner_rejected() {
 fn zero_price_rejected() {
     let mut c = market();
     let token = seed_npc(&mut c, "letters", "education", "letters.teach", 10, 0);
-    as_account(CAROL);
+    context(CAROL, START_MS, NearToken::from_yoctonear(1), [5; 32]);
     c.list(token, U128(0));
 }
 
@@ -124,4 +124,13 @@ fn owner_can_unlist() {
     as_account(CAROL);
     c.unlist(child.clone());
     assert_eq!(c.listing(child), None);
+}
+
+#[test]
+#[should_panic(expected = "Requires attached deposit of exactly 1 yoctoNEAR")]
+fn list_requires_one_yocto() {
+    let mut c = market();
+    let token = seed_npc(&mut c, "letters", "education", "letters.teach", 10, 0);
+    as_account(CAROL);
+    c.list(token, U128(NEAR));
 }

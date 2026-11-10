@@ -163,8 +163,9 @@ fn nobody_weight_leaves_some_draws_empty() {
     let mut c = ready();
     seed_npc(&mut c, "letters", "education", "letters.teach", 10, 0);
     let life = start_as(&mut c, ALICE);
-    let empty = (0..200u32).filter(|step| c.draw_npc(life.life_id, *step, "education".into(), hash(1)).token_id.is_none()).count();
-    assert!((60..=140).contains(&empty), "{empty} of 200 draws were empty at a 50% nobody weight");
+    let draws = crate::lives::MAX_RECORDS_PER_LIFE as u32;
+    let empty = (0..draws).filter(|step| c.draw_npc(life.life_id, *step, "education".into(), hash(1)).token_id.is_none()).count();
+    assert!((34..=94).contains(&empty), "{empty} of {draws} draws were empty at a 50% nobody weight");
 }
 
 #[test]
@@ -268,4 +269,33 @@ fn draw_on_missing_life_rejected() {
     let mut c = ready();
     as_account(ALICE);
     c.draw_npc(U64(99), 0, "education".into(), hash(1));
+}
+
+#[test]
+#[should_panic(expected = "Attach at least 100 Tgas")]
+fn draw_with_too_little_gas_rejected() {
+    let mut c = ready();
+    let life = start_as(&mut c, ALICE);
+    with_gas(ALICE, NearToken::from_yoctonear(0), 99);
+    c.draw_npc(life.life_id, 0, "education".into(), hash(1));
+}
+
+#[test]
+#[should_panic(expected = "This life has reached its checkpoint limit")]
+fn checkpoints_per_life_are_capped() {
+    let mut c = ready();
+    let life = start_as(&mut c, ALICE);
+    for step in 0..=crate::lives::MAX_RECORDS_PER_LIFE as u32 {
+        c.checkpoint(life.life_id, step, hash(1));
+    }
+}
+
+#[test]
+#[should_panic(expected = "This life has reached its draw limit")]
+fn draws_per_life_are_capped() {
+    let mut c = ready();
+    let life = start_as(&mut c, ALICE);
+    for step in 0..=crate::lives::MAX_RECORDS_PER_LIFE as u32 {
+        c.draw_npc(life.life_id, step, "education".into(), hash(1));
+    }
 }

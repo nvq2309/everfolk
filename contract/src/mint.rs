@@ -4,10 +4,12 @@ use crate::types::*;
 use crate::{Contract, ContractExt};
 use near_contract_standards::non_fungible_token::metadata::TokenMetadata;
 use near_sdk::json_types::{Base64VecU8, U64};
-use near_sdk::{env, near, require, serde_json, AccountId, NearToken, Promise};
+use near_sdk::{env, near, require, serde_json, AccountId, Gas, NearToken, Promise};
 
 const NPC_RARITY_WEIGHTS: [u64; 5] = [6000, 2500, 1000, 400, 100];
 const FIGURE_RARITY_WEIGHTS: [u64; 5] = [0, 0, 7000, 2500, 500];
+/// Gas floor above the most expensive outcome branch, so an outcome can't be retried by starving it of gas.
+const MIN_MINT_GAS: Gas = Gas::from_tgas(150);
 
 fn parse_signature(signature: &str) -> [u8; 64] {
     hex::decode(signature)
@@ -34,6 +36,7 @@ impl Contract {
     /// Mints a verified, finished ranked life. Randomness decides whether it becomes a figure or stays an NPC.
     #[payable]
     pub fn mint_life(&mut self, life_id: U64, evidence_json: String, signature: String, npc_action_id: String) -> MintResult {
+        require!(env::prepaid_gas() >= MIN_MINT_GAS, "Attach at least 150 Tgas to mint a life");
         let fee = self.params.mint_fee.0;
         let deposit = env::attached_deposit().as_yoctonear();
         require!(deposit >= fee, "Attach at least the mint fee");
@@ -43,16 +46,23 @@ impl Contract {
         let mut life = self.owned_alive_life(life_id.0);
         self.assert_evidence(life_id.0, &life, &evidence, &npc_action_id);
 
+        let storage_before = env::storage_usage();
         let evidence_hash = env::sha256_array(evidence_json.as_bytes());
         let outcome = self.roll_outcome(&block_seed(life_id.0, &evidence_hash), &evidence);
         let shares = compute_shares(&evidence.sources.iter().map(|s| (s.token_id.clone(), s.impact)).collect::<Vec<_>>());
         let owner = life.account_id.clone();
         let token_id = self.mint_token(&owner, life_id.0, &evidence, &outcome, &npc_action_id, &shares, &evidence_hash);
-        self.pay_sources(&token_id, fee, &shares);
+        let paid_to_sources = self.pay_sources(&token_id, fee, &shares);
 
         life.status = LifeStatus::Minted;
         self.lives.insert(life_id.0, life);
         self.active_life.remove(&owner);
+        self.lives.flush();
+        self.active_life.flush();
+        let locked = env::storage_usage().saturating_sub(storage_before) as u128 * env::storage_byte_cost().as_yoctonear();
+        require!(fee >= paid_to_sources + locked, "The mint fee does not cover this token's storage");
+        let treasury = self.treasury_id.clone();
+        self.credit(&treasury, fee - paid_to_sources - locked);
         if deposit > fee {
             Promise::new(owner).transfer(NearToken::from_yoctonear(deposit - fee)).detach();
         }
@@ -73,6 +83,7 @@ impl Contract {
             evidence.life_id == life_id.to_string() && evidence.account_id == life.account_id,
             "Evidence belongs to a different life or account"
         );
+        require!(evidence.seed == hex::encode(life.seed), "Evidence was made for a different life seed");
         require!(evidence.world_version == life.world_version, "Evidence is for a different world version");
         let influenced = |token: &str| {
             life.figure_picks.iter().any(|p| p.token_id == token) || life.draws.iter().any(|d| d.token_id.as_deref() == Some(token))

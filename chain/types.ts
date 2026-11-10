@@ -17,7 +17,8 @@ export interface SourceImpact { token_id: string; impact: number }
 
 /** Signed by the verifier as the UTF-8 bytes of canonicalJson(evidence). */
 export interface Evidence {
-  v: 1; life_id: string; account_id: string; world_version: string; world_fingerprint: string; save_hash: string;
+  /** `seed` is the hex seed from LifeView; the contract rejects evidence for any other seed. */
+  v: 1; seed: string; life_id: string; account_id: string; world_version: string; world_fingerprint: string; save_hash: string;
   stats: Record<string, number>; skills: Record<string, number>; origin_id: string; peak_job_id: string | null;
   accomplishments: { id: string; age: number }[]; death_age: number; birth_year: number; death_year: number;
   career_group: CareerGroup; matched_figures: FigureId[]; sources: SourceImpact[];
