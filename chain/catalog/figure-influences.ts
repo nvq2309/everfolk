@@ -410,17 +410,24 @@ const cleomenesCornerGrain: InfluenceEntry = {
   },
 };
 
+/** Alexandria is founded in 331 BCE: Cleomenes' administration and its grain crisis begin. */
+const GRAIN_CRISIS_START_YEAR = -331;
+/** Calibrated so the rations reach roughly one life in six (test/chain-figure-calibration.test.ts). */
+const GRANARIES_MAX_HEALTH = 45;
+
 const cleomenesGranaries: InfluenceEntry = {
   id: "cleomenes.granaries",
-  label: "Cleomenes fills the granaries: rations reach struggling households in a lean season.",
+  label: "Cleomenes fills the granaries: rations reach households weakened in the famine years.",
   baseWeight: 3,
   event: {
     id: "influence-cleomenes-granaries",
     title: "The granaries open",
-    text: "In a lean season, officials open the royal granaries that Cleomenes had filled and issue measured rations in your district. Clerks write each household's name against its share.",
-    trigger: { type: "age", at: 1 },
-    // Only a real hardship counts as a lean season: well below the 60-80 starting range.
-    when: all(...ageBetween(1, 59), statAtMost("health", 35)),
+    text: "The grain shortage that has struck the Greek cities reaches your district, and you are already weak. Officials open the royal granaries that Cleomenes had filled and issue measured rations. Clerks write each household's name against its share.",
+    trigger: { type: "year", at: GRAIN_CRISIS_START_YEAR },
+    // Famine-only: the grain crisis of Cleomenes' administration (Alexandria's founding until
+    // Ptolemy takes over, 331-324 BCE; the same shortage the corner-grain decision names), and
+    // only for a life already in poor health, well below the 60-80 starting range.
+    when: all(hasFlag("alexandria-founded"), hasFlag("ptolemy-governs-egypt", false), statAtMost("health", GRANARIES_MAX_HEALTH)),
     mode: "automatic",
     effects: [stat("health", 6), stat("bonds", 1)],
     sourceIds: ["classical-egypt-transitions"],

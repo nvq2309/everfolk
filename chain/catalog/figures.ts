@@ -18,8 +18,12 @@ export interface FigureRequirement {
 export const FIGURE_SUPPLY_CAP = 5;
 
 /**
- * Thresholds sit above every job's entry requirement so only a deliberate,
- * well-played run reaches them. Ids reference worlds/alexandria-0.33.0.json.
+ * Thresholds sit above every job's entry requirement and were calibrated on simulated
+ * playthroughs (test/chain-figure-calibration.test.ts with scripts/ranked/path-policies.ts):
+ * a deliberate run of the figure's path qualifies in about 20-30% of lives (Alexander: of
+ * royal-household births), an unfocused life almost never. Skill gains slow
+ * sharply above 70, so the 70-80 thresholds measure years of sustained practice.
+ * Ids reference worlds/alexandria-0.33.0.json.
  */
 const FIGURE_LIST: FigureRequirement[] = [
   {
@@ -29,7 +33,7 @@ const FIGURE_LIST: FigureRequirement[] = [
     supplyCap: FIGURE_SUPPLY_CAP,
     origins: ["royal-household"],
     jobsAny: ["general"],
-    minSkills: { warfare: 60, oratory: 35 },
+    minSkills: { warfare: 70, oratory: 50 },
     accomplishmentsAny: ["military-first-work", "military-prestige"],
     maxAgeAtAccomplishment: 32,
   },
@@ -39,8 +43,8 @@ const FIGURE_LIST: FigureRequirement[] = [
     summary: "A widely read teacher of argument who tutored students or advised the court and left a remembered philosophical work.",
     supplyCap: FIGURE_SUPPLY_CAP,
     jobsAny: ["philosophy-tutor", "court-adviser"],
-    minSkills: { literacy: 55, philosophy: 50 },
-    minStats: { knowledge: 45 },
+    minSkills: { literacy: 76, philosophy: 76, oratory: 50 },
+    minStats: { knowledge: 60 },
     accomplishmentsAny: ["philosophy-first-work", "philosophy-prestige"],
   },
   {
@@ -49,8 +53,8 @@ const FIGURE_LIST: FigureRequirement[] = [
     summary: "A careful reckoner and reader who worked among tables and demonstrations and left a credited piece of scholarship.",
     supplyCap: FIGURE_SUPPLY_CAP,
     jobsAny: ["sky-table-calculator", "patron-supported-reader", "philosophy-tutor"],
-    minSkills: { reckoning: 55, literacy: 50 },
-    minStats: { knowledge: 45 },
+    minSkills: { reckoning: 80, literacy: 70 },
+    minStats: { knowledge: 60 },
     accomplishmentsAny: ["astronomy-calendar-first-work", "astronomy-calendar-prestige", "philosophy-prestige"],
   },
   {
@@ -59,8 +63,8 @@ const FIGURE_LIST: FigureRequirement[] = [
     summary: "A trader or court official with a head for accounts who grew rich and closed recorded commercial agreements.",
     supplyCap: FIGURE_SUPPLY_CAP,
     jobsAny: ["court-adviser", "shopkeeper"],
-    minSkills: { reckoning: 50 },
-    minStats: { wealth: 60 },
+    minSkills: { reckoning: 80, literacy: 50 },
+    minStats: { wealth: 90 },
     accomplishmentsAny: ["commerce-first-work", "commerce-prestige"],
   },
 ];

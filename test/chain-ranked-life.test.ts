@@ -13,7 +13,8 @@ import type { LifeState, SaveFile, WorldPack } from "../src/types.ts";
 
 const CONTRACT = "everfolk-lives.testnet";
 const SEED = "5eed0000000000000000000000000000000000000000000000000000000000a1";
-const FIGURE: FigurePick = { figure_id: "cleomenes", token_id: "3", action_id: "cleomenes.granaries", rarity: 2 };
+// Corner-grain is a dated decision for every life alive in 330 BCE; the granaries open only for weakened lives in famine years.
+const FIGURE: FigurePick = { figure_id: "cleomenes", token_id: "3", action_id: "cleomenes.corner-grain", rarity: 2 };
 const NPC_TOKEN = "17";
 const NPC_RARITY = 1;
 const world = JSON.parse(readFileSync(new URL("../worlds/ranked/alexandria-ranked-1.json", import.meta.url), "utf8")) as WorldPack;

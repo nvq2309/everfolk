@@ -99,20 +99,20 @@ function state(input: StateInput = {}): LifeState {
 
 test("matches Euclid on a qualifying state and not on a near miss", () => {
   const euclid = {
-    heldJobs: ["copyist", "sky-table-calculator"], skills: { reckoning: 55, literacy: 50 }, stats: { knowledge: 45 },
+    heldJobs: ["copyist", "sky-table-calculator"], skills: { reckoning: 80, literacy: 70 }, stats: { knowledge: 60 },
     accomplishments: [{ achievementId: "astronomy-calendar-first-work", age: 40 }],
   };
   assert.deepEqual(matchFigures(state(euclid)), ["euclid"], "a job held earlier in life counts after retirement");
   assert.deepEqual(matchFigures(state({ ...euclid, heldJobs: [], jobId: "sky-table-calculator" })), ["euclid"], "the current job counts");
-  assert.deepEqual(matchFigures(state({ ...euclid, skills: { reckoning: 54, literacy: 50 } })), []);
-  assert.deepEqual(matchFigures(state({ ...euclid, stats: { knowledge: 44 } })), []);
+  assert.deepEqual(matchFigures(state({ ...euclid, skills: { reckoning: 79, literacy: 70 } })), []);
+  assert.deepEqual(matchFigures(state({ ...euclid, stats: { knowledge: 59 } })), []);
   assert.deepEqual(matchFigures(state({ ...euclid, heldJobs: ["copyist"] })), []);
   assert.deepEqual(matchFigures(state({ ...euclid, accomplishments: [{ achievementId: "commerce-first-work", age: 40 }] })), []);
 });
 
 test("matches Alexander only for royal kin with a young accomplishment", () => {
   const alexander = {
-    origin: "royal-household", heldJobs: ["soldier", "officer", "general"], skills: { warfare: 60, oratory: 35 },
+    origin: "royal-household", heldJobs: ["soldier", "officer", "general"], skills: { warfare: 70, oratory: 50 },
     accomplishments: [{ achievementId: "military-first-work", age: 32 }],
   };
   assert.deepEqual(matchFigures(state(alexander)), ["alexander"]);
@@ -124,13 +124,13 @@ test("matches Alexander only for royal kin with a young accomplishment", () => {
 
 test("matches Aristotle via philosophy-tutor", () => {
   const aristotle = {
-    jobId: "philosophy-tutor", skills: { literacy: 55, philosophy: 50, reckoning: 10 }, stats: { knowledge: 45 },
+    jobId: "philosophy-tutor", skills: { literacy: 76, philosophy: 76, oratory: 50, reckoning: 10 }, stats: { knowledge: 60 },
     accomplishments: [{ achievementId: "philosophy-first-work", age: 50 }],
   };
   assert.deepEqual(matchFigures(state(aristotle)), ["aristotle"]);
-  assert.deepEqual(matchFigures(state({ ...aristotle, skills: { literacy: 55, philosophy: 49, reckoning: 10 } })), []);
+  assert.deepEqual(matchFigures(state({ ...aristotle, skills: { literacy: 76, philosophy: 75, oratory: 50, reckoning: 10 } })), []);
   // Euclid also accepts philosophy-tutor with a philosophy prestige work, so both can match one life.
-  assert.deepEqual(matchFigures(state({ ...aristotle, skills: { literacy: 55, philosophy: 50, reckoning: 55 },
+  assert.deepEqual(matchFigures(state({ ...aristotle, skills: { literacy: 76, philosophy: 76, oratory: 50, reckoning: 80 },
     accomplishments: [{ achievementId: "philosophy-prestige", age: 50 }] })), ["aristotle", "euclid"]);
 });
 
