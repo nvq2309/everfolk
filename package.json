@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Everfolk — a storybook life simulator set on Egypt's ancient Mediterranean coast.",
+  "description": "Everfolk \u2014 a storybook life simulator set on Egypt's ancient Mediterranean coast.",
   "engines": {
     "node": ">=24"
   },
