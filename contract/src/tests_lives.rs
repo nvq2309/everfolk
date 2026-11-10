@@ -199,6 +199,15 @@ fn repeat_draw_with_different_hash_rejected() {
 }
 
 #[test]
+#[should_panic(expected = "A different category was already drawn at this step")]
+fn repeat_draw_with_different_category_rejected() {
+    let mut c = ready();
+    let life = start_as(&mut c, ALICE);
+    c.draw_npc(life.life_id, 7, "education".into(), hash(1));
+    c.draw_npc(life.life_id, 7, "war".into(), hash(1));
+}
+
+#[test]
 fn checkpoint_and_draw_may_share_a_step_with_the_same_hash() {
     let mut c = ready();
     let life = start_as(&mut c, ALICE);

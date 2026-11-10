@@ -75,7 +75,7 @@ impl Contract {
         self.abandoned_at.insert(life.account_id, now_ms());
     }
 
-    /// Picks which NPC token (if any) touches this key decision. Retrying the same step returns the stored draw.
+    /// Picks which NPC token (if any) touches this key decision. Retrying the same step, category and hash returns the stored draw.
     pub fn draw_npc(&mut self, life_id: U64, step: u32, category: String, commands_hash: String) -> Draw {
         require!(env::prepaid_gas() >= MIN_DRAW_GAS, "Attach at least 100 Tgas to draw");
         validate_hash(&commands_hash);
@@ -83,6 +83,7 @@ impl Contract {
         let mut life = self.owned_alive_life(life_id.0);
         if let Some(existing) = life.draws.iter().find(|d| d.step == step) {
             require!(existing.commands_hash == commands_hash, "A different record already exists at this step");
+            require!(existing.category == category, "A different category was already drawn at this step");
             return existing.clone();
         }
         assert_next_step(&life, step, &commands_hash);
