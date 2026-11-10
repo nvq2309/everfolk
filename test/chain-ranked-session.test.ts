@@ -121,3 +121,29 @@ test("resuming while a drawn decision is still pending does not draw again", asy
   const extra = after.draws.slice(drawsBefore).filter(d => d.step <= after.draws[drawsBefore - 1].step + 1);
   assert.deepEqual(extra, []);
 });
+
+test("sync replays commands made by the free engine and draws at key decisions", async () => {
+  const { contract, session } = await start({ nobodyWeightBps: 0 });
+  const { createEngine } = await import("../src/index.ts");
+  const free = createEngine(world);
+  let next = session.state;
+  let keyDecisionsPassed = 0;
+  for (let i = 0; i < 5_000 && next.phase !== "ended" && (keyDecisionsPassed < 2 || next.age < 30); i++) {
+    if (next.phase === "choice" && Object.hasOwn(KEY_DECISIONS, next.pendingEventId ?? "")) keyDecisionsPassed++;
+    next = next.phase === "choice" ? free.choose(next, free.getChoices(next)[0].id) : free.advance(next);
+  }
+  assert.ok(keyDecisionsPassed >= 2, "the free engine passed key decisions inside the batch");
+  const synced = await session.sync(next);
+  assert.equal(synced, session.state);
+  const life = (await contract.getLife(session.life.life_id))!;
+  assert.ok(life.draws.length > 0, "key decisions inside the batch were drawn on chain");
+  assert.ok(life.checkpoints.length >= 4, "checkpoints were recorded while replaying");
+  assert.deepEqual(await validateRankedSave(life, JSON.parse(session.save()) as SaveFile, CONTRACT), { ok: true });
+});
+
+test("sync rejects a state that does not continue this ranked life", async () => {
+  const { session } = await start();
+  const { createEngine } = await import("../src/index.ts");
+  const other = createEngine(world).start("cd".repeat(32));
+  await assert.rejects(session.sync(other), /does not continue this ranked life/);
+});

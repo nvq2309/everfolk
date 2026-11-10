@@ -33,6 +33,12 @@ export interface RankedSession {
   save(): string;
   /** Engine step, then the 5-year checkpoint and any key-decision draw. Influences only come from the chain. */
   dispatch(command: Command): Promise<void>;
+  /**
+   * Adopts a state produced by the ordinary game loop from this session's state: its new commands are replayed one by
+   * one through `dispatch`, so each key decision draws on chain first. Replay stops at the first command the drawn
+   * influences made impossible; the returned state (this session's) is what the player continues from.
+   */
+  sync(next: LifeState): Promise<LifeState>;
   finish(fetcher?: typeof fetch): Promise<SignedEvidence>;
   mint(signed: SignedEvidence, npcActionId: string): Promise<MintResult>;
   abandon(): Promise<void>;
@@ -96,6 +102,24 @@ class Session implements RankedSession {
     this.persist();
     if (Math.floor(this.state.age / CHECKPOINT_YEARS) > Math.floor(ageBefore / CHECKPOINT_YEARS)) await this.checkpoint();
     await this.drawIfKeyDecision();
+  }
+
+  async sync(next: LifeState): Promise<LifeState> {
+    const mine = this.commands();
+    const theirs = (JSON.parse(this.engine.save(next)) as SaveFile).commands;
+    const continues = next.seed === this.state.seed && theirs.length >= mine.length &&
+      mine.every((command, index) => JSON.stringify(command) === JSON.stringify(theirs[index]));
+    if (!continues) throw new Error("This state does not continue this ranked life.");
+    for (const command of theirs.slice(mine.length)) {
+      if (this.state.phase === "ended") break;
+      try {
+        await this.dispatch(command);
+      } catch (error) {
+        if (error instanceof Error && /chain|network|wallet|rpc|fetch/i.test(error.message)) throw error;
+        break; // An on-chain influence changed what this command could do; the player continues from here.
+      }
+    }
+    return this.state;
   }
 
   private step(command: Command): LifeState {
