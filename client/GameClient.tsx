@@ -7,7 +7,7 @@ import { engineForLife, hasLifeBegun, readSavedLife, selectWorldPack } from "./s
 import type { LifeState } from "../src/types.ts";
 import { contentFingerprint } from "../src/random.ts";
 import { selectFactoryWorld } from "./factory-world-selection.ts";
-import ChainLayer from "./chain/ChainLayer.tsx";
+import ChainLayer, { type ChainLayerSession } from "./chain/ChainLayer.tsx";
 
 const SELECTION_KEY = "historical-lives:selected-world:v1";
 
@@ -26,6 +26,8 @@ export default function GameClient() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const dialog = useRef<HTMLDialogElement>(null);
+  // Set by the ranked session (Task 17). Free play leaves it null, so only a ranked life's ending shows the life report.
+  const [rankedSession, setRankedSession] = useState<ChainLayerSession | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -135,6 +137,6 @@ export default function GameClient() {
         <div className="world-library">{worlds.map(world => <article key={world.id}><span className="eyebrow">{world.id === active.world.id ? "YOUR CURRENT WORLD" : "A WORLD TO EXPLORE"}</span><h3>{world.title}</h3><p>{world.description}</p><div className="world-route-tags">{world.routes.filter(route => route.enabled).map(route => <span key={route.id}>{route.title}</span>)}</div><button className="primary-button" disabled={busy} onClick={() => { void enterWorld(world.id, false); }}>Enter this world →</button></article>)}</div>
       </div>
     </dialog>
-    <ChainLayer />
+    <ChainLayer rankedSession={rankedSession} onRankedClosed={() => setRankedSession(null)} />
   </>;
 }

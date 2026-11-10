@@ -2,6 +2,7 @@ import { useEffect, useRef, useSyncExternalStore, type ReactNode } from "react";
 import type { LifeView } from "../../chain/types.ts";
 import { useChainBackend, type ChainBackend } from "./chain-backend.ts";
 import { chainHref, parseChainRoute, type ChainRoute } from "./chain-route.ts";
+import RankedEnding, { type RankedEndingSession } from "./RankedEnding.tsx";
 import RankedEntry from "./RankedEntry.tsx";
 import "./chain.css";
 
@@ -36,15 +37,26 @@ function ChainShell({ backend, focusKey, children }: { backend: ChainBackend | n
   </div>;
 }
 
+/** An active ranked session as GameClient holds it; `state` is the engine's life state. */
+export type ChainLayerSession = RankedEndingSession & { state: { phase: string } };
+
 export interface ChainLayerProps {
   /** Hands a started ranked life to the ranked session (Task 17). */
   onBeginRanked?(life: LifeView): void;
+  /** Only a ranked life shows the end-of-life report; free play passes nothing. */
+  rankedSession?: ChainLayerSession | null;
+  onRankedClosed?(): void;
 }
 
 /** Ranked screens over the game, opened by hash routes. The game stays mounted underneath. */
-export default function ChainLayer({ onBeginRanked }: ChainLayerProps) {
+export default function ChainLayer({ onBeginRanked, rankedSession, onRankedClosed }: ChainLayerProps) {
   const route = useChainRoute();
   const backend = useChainBackend();
+  if (rankedSession?.state.phase === "ended" && backend && !route) {
+    return <ChainShell backend={backend} focusKey={`ending:${rankedSession.life.life_id}`}>
+      <RankedEnding session={rankedSession} contract={backend.contract} onClose={() => onRankedClosed?.()} />
+    </ChainShell>;
+  }
   if (!route) return null;
   let content: ReactNode = <p className="chain-loading" role="status">Opening the ledger…</p>;
   if (backend && route.kind === "ranked") content = <RankedEntry backend={backend} onBegin={onBeginRanked} />;
