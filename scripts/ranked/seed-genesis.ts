@@ -1,6 +1,7 @@
 // Plays and mints "genesis" ranked lives on testnet so the NPC draw pools are not empty for the demo.
 //   CONTRACT_ID=everfolk-lives-11101338.testnet COUNT=6 node scripts/ranked/seed-genesis.ts
 //   ACCOUNTS=a.testnet,b.testnet … reuses existing keychain accounts instead of the (rate-limited) faucet.
+//   PATHS=military,sky … plays account i along career path i (scripts/ranked/path-policies.ts) instead of a yearly focus.
 // Needs RANKED_VERIFIER_SECRET in .dev.vars (the key registered on the contract). Accounts come from the testnet faucet.
 import { readFileSync } from "node:fs";
 import { buildEvidence } from "../../chain/evidence.ts";
@@ -11,6 +12,7 @@ import { createEngine } from "../../src/index.ts";
 import type { WorldPack } from "../../src/types.ts";
 import { advanceYearWithFocus, selectAutomaticChoice, type YearlyFocusId } from "../../client/yearly-focus.ts";
 import { createCliContract, createFaucetAccount } from "./cli-contract.ts";
+import { nextState, PATH_IDS, type PathId } from "./path-policies.ts";
 
 const ROOT = new URL("../../", import.meta.url);
 const contractId = process.env.CONTRACT_ID ?? "";
@@ -29,6 +31,8 @@ function chooser(seed: number): (n: number) => number {
 }
 
 const reuse = (process.env.ACCOUNTS ?? "").split(",").map(a => a.trim()).filter(Boolean);
+const paths = (process.env.PATHS ?? "").split(",").map(p => p.trim()).filter(Boolean) as PathId[];
+for (const path of paths) if (!PATH_IDS.includes(path)) throw new Error(`Unknown path ${path}; use one of ${PATH_IDS.join(", ")}.`);
 
 async function genesisLife(index: number, stamp: number): Promise<string> {
   const account = reuse[index - 1] ?? `genesis-${stamp}-${index}.testnet`;
@@ -43,8 +47,10 @@ async function genesisLife(index: number, stamp: number): Promise<string> {
   const pick = chooser(stamp + index * 7919);
   const focus = FOCUSES[(index - 1) % FOCUSES.length];
   const engine = createEngine(world);
+  const path = paths[index - 1];
   for (let i = 0; i < 5_000 && session.state.phase !== "ended"; i++) {
     const state = session.state;
+    if (path) { await session.sync(nextState(engine, state, path)); continue; }
     if (state.phase === "choice") {
       const choices = engine.getChoices(state);
       const safe = selectAutomaticChoice(choices, world, state);
