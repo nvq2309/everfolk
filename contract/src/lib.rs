@@ -9,6 +9,7 @@ mod random;
 mod shares;
 mod tokens;
 mod types;
+mod views;
 
 use near_contract_standards::non_fungible_token::NonFungibleToken;
 use near_sdk::store::{IterableMap, LookupMap};
