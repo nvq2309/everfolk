@@ -3,6 +3,7 @@ import type { SaveFile } from "../../src/types.ts";
 import type { ContentDatabase } from "../store.ts";
 import { readEvidence, storeEvidence } from "./evidence-store.ts";
 import { viewLife } from "./near-view.ts";
+import { clientKey, defaultVerifyLimiter, type RateLimiter } from "./rate-limit.ts";
 import { createEvidenceSigner } from "./signer.ts";
 import { VerificationError, type LifeVerifier } from "./verifier.ts";
 
@@ -13,12 +14,15 @@ const DEFAULT_RPC_URL = "https://test.rpc.fastnear.com";
 
 export interface RankedEnvironment {
   DB?: ContentDatabase; RANKED_VERIFIER_SECRET?: string; RANKED_CONTRACT_ID?: string; NEAR_RPC_URL?: string;
+  /** Optional Cloudflare rate-limit binding; without it a per-isolate limiter applies. */
+  RANKED_RATE_LIMITER?: RateLimiter;
 }
 
 export interface RankedDependencies {
   verifier?: (env: RankedEnvironment) => Promise<LifeVerifier>;
   fetch?: typeof fetch;
   now?: () => Date;
+  limiter?: RateLimiter;
 }
 
 class RouteError extends Error {
@@ -62,6 +66,11 @@ async function verify(request: Request, env: RankedEnvironment, deps: RankedDepe
   const { contractId, rpcUrl } = configured(env);
   if (!deps.verifier) throw new RouteError(503, "Ranked lives are not set up on this server yet.");
   const { lifeId, saveJson, save } = parseVerifyRequest(await readBody(request));
+  // After the cheap checks, before the RPC read and the replay.
+  const limiter = deps.limiter ?? env.RANKED_RATE_LIMITER ?? defaultVerifyLimiter;
+  if (!(await limiter.limit({ key: `verify:${clientKey(request)}` })).success) {
+    throw new RouteError(429, "Too many lives verified from here just now. Wait a minute and try again.");
+  }
   const life = await viewLife(rpcUrl, contractId, lifeId, deps.fetch ?? fetch);
   if (!life) throw new RouteError(404, "This ranked life was not found on NEAR.");
   const signed = await (await deps.verifier(env)).verify(life, save);

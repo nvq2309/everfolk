@@ -9,16 +9,23 @@ const NEAR_CLI = ["-y", "near-cli-rs@0.31.1"];
 const NETWORK = ["network-config", "testnet"];
 
 const RATE_LIMITED = /rate limit|429|too many requests/i;
+/** near-cli-rs prints the transaction id once it has sent the transaction; failures after that are not safe to retry. */
+const SENT = /Transaction ID:|Transaction Execution Info/i;
 const MAX_ATTEMPTS = 6;
 
-/** Public testnet RPC rate-limits bursts; those failures happen before a transaction is sent, so retrying is safe. */
+/** Sent but its outcome unknown (for example the status poll was rate-limited). Callers must check the chain. */
+export class UnconfirmedTransactionError extends Error {}
+
+/** Retries rate-limited calls only while nothing has been sent, so a retry can never send a transaction twice. */
 async function cli(args: string[]): Promise<string> {
   for (let attempt = 1; ; attempt++) {
     try {
       const { stdout } = await run("npx", [...NEAR_CLI, ...args], { maxBuffer: 64 * 1024 * 1024 });
       return stdout;
     } catch (error) {
-      const text = `${(error as { stderr?: string }).stderr ?? ""}${(error as Error).message}`;
+      const output = `${(error as { stdout?: string }).stdout ?? ""}${(error as { stderr?: string }).stderr ?? ""}`;
+      const text = `${output}${(error as Error).message}`;
+      if (SENT.test(output)) throw new UnconfirmedTransactionError(`Sent, but the outcome could not be read: ${(error as Error).message.slice(0, 200)}`);
       if (attempt >= MAX_ATTEMPTS || !RATE_LIMITED.test(text)) throw error;
       await new Promise(resolve => setTimeout(resolve, 2_000 * 2 ** attempt));
     }
@@ -50,7 +57,11 @@ export function createCliContract(contractId: string, accountId: string): LivesC
   const unsupported = (name: string) => () => Promise.reject(new Error(`${name} is not available in the CLI contract.`));
   return {
     async startLife(worldVersion) {
-      await callMethod(accountId, contractId, "start_life", { world_version: worldVersion }, "0 NEAR", "50.0 Tgas");
+      try {
+        await callMethod(accountId, contractId, "start_life", { world_version: worldVersion }, "0 NEAR", "50.0 Tgas");
+      } catch (error) {
+        if (!(error instanceof UnconfirmedTransactionError)) throw error; // the active-life read below settles it
+      }
       const life = await viewMethod<LifeView | null>(contractId, "active_life_of", { account_id: accountId });
       if (!life) throw new Error("start_life succeeded but no active life was found.");
       return life;
@@ -71,8 +82,12 @@ export function createCliContract(contractId: string, accountId: string): LivesC
     async mintLife(lifeId: string, signed: SignedEvidence, npcActionId: string): Promise<MintResult> {
       const { mint_fee: fee } = await viewMethod<{ mint_fee: string }>(contractId, "get_params", {});
       const before = await viewMethod<{ token_id: string }[]>(contractId, "nft_tokens_for_owner", { account_id: accountId });
-      await callMethod(accountId, contractId, "mint_life",
-        { life_id: lifeId, evidence_json: signed.evidence_json, signature: signed.signature, npc_action_id: npcActionId }, `${fee} yoctoNEAR`, "200.0 Tgas");
+      try {
+        await callMethod(accountId, contractId, "mint_life",
+          { life_id: lifeId, evidence_json: signed.evidence_json, signature: signed.signature, npc_action_id: npcActionId }, `${fee} yoctoNEAR`, "200.0 Tgas");
+      } catch (error) {
+        if (!(error instanceof UnconfirmedTransactionError)) throw error; // the token read below settles it
+      }
       const after = await viewMethod<{ token_id: string; metadata: { extra: string } }[]>(contractId, "nft_tokens_for_owner", { account_id: accountId });
       const token = after.find(t => !before.some(b => b.token_id === t.token_id));
       if (!token) throw new Error("mint_life succeeded but no new token was found.");

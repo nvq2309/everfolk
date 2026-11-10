@@ -29,7 +29,8 @@ function rpcReturning(value: unknown): typeof fetch {
 }
 
 function env(overrides: Partial<RankedEnvironment> = {}): RankedEnvironment {
-  return { DB: new TestDatabase(), RANKED_VERIFIER_SECRET: "07".repeat(32), RANKED_CONTRACT_ID: "lives.testnet", NEAR_RPC_URL: "https://rpc.test", ...overrides };
+  const allowAll = { limit: async () => ({ success: true }) };
+  return { DB: new TestDatabase(), RANKED_VERIFIER_SECRET: "07".repeat(32), RANKED_CONTRACT_ID: "lives.testnet", NEAR_RPC_URL: "https://rpc.test", RANKED_RATE_LIMITER: allowAll, ...overrides };
 }
 
 const post = (body: string) => new Request(`${ORIGIN}/api/ranked/verify`, { method: "POST", headers: { "content-type": "application/json" }, body });
@@ -117,4 +118,30 @@ test("a save that is JSON but not a life is rejected with 400", async () => {
     assert.equal(response.status, 400, save);
     assert.match((await response.json()).error, /save file/i);
   }
+});
+
+test("verify is rate limited per client and recovers after the window", async () => {
+  const { createMemoryLimiter } = await import("../server/ranked/rate-limit.ts");
+  let now = 0;
+  const limiter = createMemoryLimiter({ limit: 2, windowMs: 60_000, now: () => now });
+  const deps = { verifier: async () => fakeVerifier(signed), fetch: rpcReturning(LIFE), limiter };
+  const from = (ip: string) => new Request(`${ORIGIN}/api/ranked/verify`, { method: "POST", headers: { "content-type": "application/json", "cf-connecting-ip": ip }, body: verifyBody });
+  const e = env();
+  assert.equal((await handleRankedApi(from("1.1.1.1"), e, deps)).status, 200);
+  assert.equal((await handleRankedApi(from("1.1.1.1"), e, deps)).status, 200);
+  const limited = await handleRankedApi(from("1.1.1.1"), e, deps);
+  assert.equal(limited.status, 429);
+  assert.match((await limited.json()).error, /too many/i);
+  assert.equal((await handleRankedApi(from("2.2.2.2"), e, deps)).status, 200, "other clients are unaffected");
+  now = 60_001;
+  assert.equal((await handleRankedApi(from("1.1.1.1"), e, deps)).status, 200);
+});
+
+test("a Cloudflare rate-limit binding is used when present", async () => {
+  const calls: string[] = [];
+  const binding = { limit: async ({ key }: { key: string }) => { calls.push(key); return { success: false }; } };
+  const response = await handleRankedApi(new Request(`${ORIGIN}/api/ranked/verify`, { method: "POST", headers: { "cf-connecting-ip": "3.3.3.3" }, body: verifyBody }),
+    env({ RANKED_RATE_LIMITER: binding }), { verifier: async () => fakeVerifier(signed), fetch: rpcReturning(LIFE) });
+  assert.equal(response.status, 429);
+  assert.deepEqual(calls, ["verify:3.3.3.3"]);
 });

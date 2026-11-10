@@ -26,7 +26,7 @@ test("a full ranked life verifies through the API with the real ranked world", a
   assert.equal(session.state.phase, "ended");
   const life = await contract.getLife(session.life.life_id);
   const rpc = (async () => new Response(JSON.stringify({ result: { result: [...new TextEncoder().encode(JSON.stringify(life))] } }))) as unknown as typeof fetch;
-  const env = { DB: new TestDatabase(), RANKED_VERIFIER_SECRET: SECRET, RANKED_CONTRACT_ID: CONTRACT, NEAR_RPC_URL: "https://rpc.test", RANKED: { ...defaultRankedDependencies(), fetch: rpc } };
+  const env = { DB: new TestDatabase(), RANKED_VERIFIER_SECRET: SECRET, RANKED_CONTRACT_ID: CONTRACT, NEAR_RPC_URL: "https://rpc.test", RANKED: { ...defaultRankedDependencies(), fetch: rpc }, RANKED_RATE_LIMITER: { limit: async () => ({ success: true }) } };
   const response = await handleApi(new Request("https://everfolk.test/api/ranked/verify", {
     method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ life_id: session.life.life_id, save: session.save() }),
   }), env);
@@ -50,7 +50,7 @@ test("the API refuses a ranked life that skipped its key-decision draws", async 
   for (let i = 0; i < 20_000 && state.phase !== "ended"; i++) state = state.phase === "choice" ? engine.choose(state, engine.getChoices(state)[0].id) : engine.advance(state);
   const onChain = await contract.getLife(life.life_id);
   const rpc = (async () => new Response(JSON.stringify({ result: { result: [...new TextEncoder().encode(JSON.stringify(onChain))] } }))) as unknown as typeof fetch;
-  const env = { DB: new TestDatabase(), RANKED_VERIFIER_SECRET: SECRET, RANKED_CONTRACT_ID: CONTRACT, NEAR_RPC_URL: "https://rpc.test", RANKED: { ...defaultRankedDependencies(), fetch: rpc } };
+  const env = { DB: new TestDatabase(), RANKED_VERIFIER_SECRET: SECRET, RANKED_CONTRACT_ID: CONTRACT, NEAR_RPC_URL: "https://rpc.test", RANKED: { ...defaultRankedDependencies(), fetch: rpc }, RANKED_RATE_LIMITER: { limit: async () => ({ success: true }) } };
   const response = await handleApi(new Request("https://everfolk.test/api/ranked/verify", {
     method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ life_id: life.life_id, save: engine.save(state) }),
   }), env);
