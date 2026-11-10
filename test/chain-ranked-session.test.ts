@@ -168,3 +168,99 @@ test("beginRankedSession refuses a recorded life with no progress on this device
   const life = (await contract.getLife(session.life.life_id))!;
   await assert.rejects(beginRankedSession({ contract, contractId: CONTRACT, verifyUrl: "x", world, storage: memoryStorage() }, life), /no saved progress/);
 });
+
+/** Wraps a contract so the next `drawNpc` / `checkpoint` call fails, optionally after it already landed on chain. */
+function flaky(contract: ReturnType<typeof createMockContract>) {
+  const failures = { drawAfterLanding: 0, checkpointBeforeLanding: 0, getLife: 0 };
+  const wrapped = Object.create(contract) as typeof contract;
+  wrapped.getLife = async (...args) => {
+    if (failures.getLife > 0) { failures.getLife--; throw new Error("RPC timeout"); }
+    return contract.getLife(...args);
+  };
+  wrapped.drawNpc = async (...args) => {
+    const draw = await contract.drawNpc(...args);
+    if (failures.drawAfterLanding > 0) { failures.drawAfterLanding--; throw new Error("draw_npc failed: Transaction has not finished yet"); }
+    return draw;
+  };
+  wrapped.checkpoint = async (...args) => {
+    if (failures.checkpointBeforeLanding > 0) { failures.checkpointBeforeLanding--; throw new Error("checkpoint failed: 429 Too Many Requests"); }
+    return contract.checkpoint(...args);
+  };
+  return { wrapped, failures };
+}
+
+async function playThrough(session: RankedSession, untilAge: number, onError: (error: unknown) => void) {
+  for (let i = 0; i < 20_000 && session.state.phase !== "ended" && session.state.age < untilAge; i++) {
+    const command: Command = session.state.phase === "choice" ? { type: "choose", choice: session.choices()[0].id } : { type: "advance" };
+    try { await session.dispatch(command); } catch (error) { onError(error); }
+  }
+}
+
+test("a draw that landed on chain but failed on the client is recovered", async () => {
+  const { checkRankedObligations } = await import("../chain/ranked-rules.ts");
+  const { createEngine } = await import("../src/index.ts");
+  const contract = createMockContract({ nobodyWeightBps: 0 });
+  const { wrapped, failures } = flaky(contract);
+  const session = await startRankedSession({ contract: wrapped, contractId: CONTRACT, verifyUrl: "x", world, storage: memoryStorage() });
+  failures.drawAfterLanding = 3;
+  const errors: unknown[] = [];
+  await playThrough(session, 40, error => errors.push(error));
+  const life = (await contract.getLife(session.life.life_id))!;
+  assert.ok(life.draws.length >= 1);
+  const result = checkRankedObligations(createEngine(world), life, JSON.parse(session.save()) as SaveFile);
+  assert.equal(result.ok, true, result.ok ? "" : result.reason);
+  assert.deepEqual(await validateRankedSave(life, JSON.parse(session.save()) as SaveFile, CONTRACT), { ok: true });
+});
+
+test("a failed checkpoint is retried before the life moves on, and the draw is not skipped", async () => {
+  const { checkRankedObligations } = await import("../chain/ranked-rules.ts");
+  const { createEngine } = await import("../src/index.ts");
+  const { ChainActionError } = await import("../client/chain/ranked-session.ts");
+  const contract = createMockContract({ nobodyWeightBps: 0 });
+  const { wrapped, failures } = flaky(contract);
+  const session = await startRankedSession({ contract: wrapped, contractId: CONTRACT, verifyUrl: "x", world, storage: memoryStorage() });
+  failures.checkpointBeforeLanding = 2;
+  const errors: unknown[] = [];
+  await playThrough(session, 40, error => errors.push(error));
+  assert.equal(errors.length, 2);
+  assert.ok(errors.every(error => error instanceof ChainActionError));
+  const life = (await contract.getLife(session.life.life_id))!;
+  const result = checkRankedObligations(createEngine(world), life, JSON.parse(session.save()) as SaveFile);
+  assert.equal(result.ok, true, result.ok ? "" : result.reason);
+});
+
+test("sync surfaces chain failures instead of swallowing them", async () => {
+  const { ChainActionError } = await import("../client/chain/ranked-session.ts");
+  const { createEngine } = await import("../src/index.ts");
+  const contract = createMockContract({ nobodyWeightBps: 0 });
+  const { wrapped, failures } = flaky(contract);
+  const session = await startRankedSession({ contract: wrapped, contractId: CONTRACT, verifyUrl: "x", world, storage: memoryStorage() });
+  failures.checkpointBeforeLanding = 1;
+  const free = createEngine(world);
+  let next = session.state;
+  for (let i = 0; i < 400 && next.age < 6 && next.phase !== "ended"; i++) next = next.phase === "choice" ? free.choose(next, free.getChoices(next)[0].id) : free.advance(next);
+  await assert.rejects(session.sync(next), ChainActionError);
+});
+
+test("resume applies a draw that landed on chain but was never saved on this device", async () => {
+  const { checkRankedObligations } = await import("../chain/ranked-rules.ts");
+  const { createEngine } = await import("../src/index.ts");
+  const contract = createMockContract({ nobodyWeightBps: 0 });
+  const { wrapped, failures } = flaky(contract);
+  const storage = memoryStorage();
+  const session = await startRankedSession({ contract: wrapped, contractId: CONTRACT, verifyUrl: "x", world, storage });
+  failures.drawAfterLanding = 1;
+  failures.getLife = 1; // the re-read fails too, as if the tab closed before anything was saved
+  let failed = false;
+  for (let i = 0; i < 20_000 && !failed && session.state.phase !== "ended"; i++) {
+    const command: Command = session.state.phase === "choice" ? { type: "choose", choice: session.choices()[0].id } : { type: "advance" };
+    try { await session.dispatch(command); } catch { failed = true; }
+  }
+  assert.ok(failed, "a draw failed after landing");
+  // The tab closes here: a new session resumes from what this device saved.
+  const resumed = await resumeRankedSession({ contract, contractId: CONTRACT, verifyUrl: "x", world, storage }, session.life.life_id);
+  await playThrough(resumed, 30, () => {});
+  const life = (await contract.getLife(session.life.life_id))!;
+  const result = checkRankedObligations(createEngine(world), life, JSON.parse(resumed.save()) as SaveFile);
+  assert.equal(result.ok, true, result.ok ? "" : result.reason);
+});

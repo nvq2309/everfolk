@@ -7,6 +7,7 @@ import { engineForLife, hasLifeBegun, readSavedLife, registerWorldPack, selectWo
 import type { LifeState } from "../src/types.ts";
 import { contentFingerprint } from "../src/random.ts";
 import { selectFactoryWorld } from "./factory-world-selection.ts";
+import { keepFreePlayOnRankedStart } from "./ranked-return.ts";
 import ChainLayer from "./chain/ChainLayer.tsx";
 import type { ChainBackend } from "./chain/chain-backend.ts";
 import { loadRankedConfig } from "./chain/chain-backend.ts";
@@ -51,6 +52,7 @@ export default function GameClient() {
       contract: backend.contract, contractId: config?.contract_id ?? PREVIEW_CONTRACT_ID,
       verifyUrl: "/api/ranked/verify", world: await loadRankedWorld(),
     }, life);
+    setActive(keepFreePlayOnRankedStart);
     setRankedSession(session);
   }
 

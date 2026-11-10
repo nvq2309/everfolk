@@ -5,7 +5,8 @@ import { canonicalJson } from "../src/random.ts";
 import { createEngine } from "../src/index.ts";
 import type { LifeState, SaveFile, WorldPack } from "../src/types.ts";
 import type { Evidence, LifeView } from "../chain/types.ts";
-import { sha256Hex } from "../chain/hash.ts";
+import { commandsHash, sha256Hex } from "../chain/hash.ts";
+import { rankedObligations } from "../chain/ranked-rules.ts";
 import { createServerSignerVerifier, VerificationError } from "../server/ranked/verifier.ts";
 
 const CONTRACT = "lives.testnet";
@@ -23,10 +24,15 @@ function play(untilEnd: boolean): SaveFile {
   return JSON.parse(engine.save(state)) as SaveFile;
 }
 
-const life = (save: SaveFile): LifeView => ({
-  life_id: "5", account_id: "alice.testnet", seed: save.seed, world_version: `${world.id}-${world.version}`, status: "alive",
-  figure_picks: [], draws: [], checkpoints: [], started_at_ms: 0,
-});
+/** The on-chain record an honest client leaves: every five-year checkpoint the rules require. */
+async function lifeFor(save: SaveFile): Promise<LifeView> {
+  const { required } = rankedObligations(createEngine(world), 0, save);
+  const checkpoints = await Promise.all(required.filter(o => o.kind === "checkpoint").map(async o => ({ step: o.step, commands_hash: await commandsHash(save.commands, o.step) })));
+  return {
+    life_id: "5", account_id: "alice.testnet", seed: save.seed, world_version: `${world.id}-${world.version}`, status: "alive",
+    figure_picks: [], draws: [], checkpoints, started_at_ms: 0,
+  };
+}
 
 const stubEvidence = async (input: { life: LifeView; save: SaveFile; state: LifeState; worldFingerprint: string }): Promise<Evidence> => ({
   v: 1, seed: input.life.seed, life_id: input.life.life_id, account_id: input.life.account_id, world_version: input.life.world_version,
@@ -43,7 +49,7 @@ const verifier = () => createServerSignerVerifier({
 test("signs evidence for a finished life that verifies with the published key", async () => {
   const save = play(true);
   const v = await verifier();
-  const signed = await v.verify(life(save), save);
+  const signed = await v.verify(await lifeFor(save), save);
   assert.equal(signed.verifier_kind, "server-signer");
   assert.equal(signed.evidence_json, canonicalJson(signed.evidence));
   assert.equal(signed.evidence_hash, await sha256Hex(signed.evidence_json));
@@ -57,22 +63,22 @@ test("signs evidence for a finished life that verifies with the published key", 
 
 test("refuses an unfinished life", async () => {
   const save = play(false);
-  await assert.rejects((await verifier()).verify(life(save), save), new VerificationError("This life has not ended yet."));
+  await assert.rejects((await verifier()).verify(await lifeFor(save), save), new VerificationError("This life has not ended yet."));
 });
 
 test("refuses an invalid ranked save with the validation reason", async () => {
   const save = play(true);
-  await assert.rejects((await verifier()).verify({ ...life(save), seed: "cd".repeat(32) }, save), new VerificationError("This save does not belong to this ranked life."));
+  await assert.rejects((await verifier()).verify({ ...(await lifeFor(save)), seed: "cd".repeat(32) }, save), new VerificationError("This save does not belong to this ranked life."));
 });
 
 test("refuses a world version the verifier does not have", async () => {
   const save = play(true);
-  await assert.rejects((await verifier()).verify({ ...life(save), world_version: "other-1" }, { ...save, worldId: "other", worldVersion: "1" }),
+  await assert.rejects((await verifier()).verify({ ...(await lifeFor(save)), world_version: "other-1" }, { ...save, worldId: "other", worldVersion: "1" }),
     new VerificationError("This world version is not supported by the verifier."));
 });
 
 test("refuses a save whose world content differs", async () => {
   const save = play(true);
-  await assert.rejects((await verifier()).verify(life(save), { ...save, worldFingerprint: "fnv1a64-0000000000000000" }),
+  await assert.rejects((await verifier()).verify(await lifeFor(save), { ...save, worldFingerprint: "fnv1a64-0000000000000000" }),
     new VerificationError("This save was played on different world content."));
 });

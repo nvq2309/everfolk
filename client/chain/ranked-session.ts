@@ -1,12 +1,11 @@
-import { keyDecisionCategory } from "../../chain/catalog/key-decisions.ts";
 import { commandsHash } from "../../chain/hash.ts";
 import { RANKED_WORLD_VERSION } from "../../chain/ids.ts";
 import { activationCommand, applyCommand } from "../../chain/validate-ranked.ts";
+import { ObligationTracker, rankedObligations, stepCommand, type Obligation } from "../../chain/ranked-rules.ts";
 import { createEngine } from "../../src/index.ts";
 import type { Choice, Command, LifeEngine, LifeState, SaveFile, WorldPack } from "../../src/types.ts";
 import type { Draw, LifeView, LivesContract, MintResult, SignedEvidence } from "./types.ts";
 
-const CHECKPOINT_YEARS = 5;
 
 export interface SessionStorage {
   getItem(key: string): string | null;
@@ -51,6 +50,16 @@ function browserStorage(): SessionStorage {
   return localStorage;
 }
 
+/** A chain action (draw or checkpoint) the life still owes; the life cannot move on until it lands. Retrying is safe. */
+export class ChainActionError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ChainActionError";
+  }
+}
+
+const CHAIN_RETRY = "The NEAR network didn't confirm in time. Your life is safe; try that again.";
+
 class Session implements RankedSession {
   life: LifeView;
   state: LifeState;
@@ -59,13 +68,18 @@ class Session implements RankedSession {
   private readonly engine: LifeEngine;
   private readonly options: RankedSessionOptions;
   private readonly storage: SessionStorage;
+  private tracker: ObligationTracker;
+  /** Draws and checkpoints owed at the end of the command log, oldest first. */
+  private owed: Obligation[] = [];
 
-  constructor(options: RankedSessionOptions, life: LifeView, state: LifeState) {
+  constructor(options: RankedSessionOptions, life: LifeView, state: LifeState, tracker = new ObligationTracker(), owed: Obligation[] = []) {
     this.options = options;
     this.storage = options.storage ?? browserStorage();
     this.engine = createEngine(options.world);
     this.life = life;
     this.state = state;
+    this.tracker = tracker;
+    this.owed = owed;
   }
 
   static engineFor(world: WorldPack): LifeEngine {
@@ -91,17 +105,20 @@ class Session implements RankedSession {
   async applyFigures(): Promise<void> {
     for (const pick of this.life.figure_picks) this.state = this.engine.influence(this.state, activationCommand(pick, this.options.contractId));
     this.persist();
-    await this.drawIfKeyDecision();
+    this.owed.push(...this.tracker.at(this.state, this.commands().length));
+    await this.settle();
   }
 
   async dispatch(command: Command): Promise<void> {
     if (command.type === "influence") throw new Error("Influences only come from the chain.");
     if (this.state.phase === "ended") throw new Error("This life has ended.");
+    await this.settle(); // Anything still owed reaches the chain before the life moves on.
     const ageBefore = this.state.age;
-    this.state = this.step(command);
+    this.state = stepCommand(this.engine, this.state, command);
     this.persist();
-    if (Math.floor(this.state.age / CHECKPOINT_YEARS) > Math.floor(ageBefore / CHECKPOINT_YEARS)) await this.checkpoint();
-    await this.drawIfKeyDecision();
+    const step = this.commands().length;
+    this.owed.push(...this.tracker.after(command, ageBefore, this.state, step), ...this.tracker.at(this.state, step));
+    await this.settle();
   }
 
   async sync(next: LifeState): Promise<LifeState> {
@@ -115,52 +132,70 @@ class Session implements RankedSession {
       try {
         await this.dispatch(command);
       } catch (error) {
-        if (error instanceof Error && /chain|network|wallet|rpc|fetch/i.test(error.message)) throw error;
+        if (error instanceof ChainActionError) throw error;
         break; // An on-chain influence changed what this command could do; the player continues from here.
       }
     }
     return this.state;
   }
 
-  private step(command: Command): LifeState {
-    switch (command.type) {
-      case "advance": return this.engine.advance(this.state);
-      case "choose": return this.engine.choose(this.state, command.choice);
-      case "act": return this.engine.act(this.state, command.activity);
-      case "avatar": return this.engine.chooseAvatar(this.state, command.variant);
-      default: throw new Error("Unknown command.");
+  /** Pays every owed draw and checkpoint in order. After a failure, the chain is re-read: an action that landed counts. */
+  private async settle(): Promise<void> {
+    while (this.owed.length > 0) {
+      const obligation = this.owed[0];
+      try {
+        await this.fulfil(obligation);
+      } catch {
+        if (!(await this.reconcile(obligation))) throw new ChainActionError(CHAIN_RETRY);
+      }
+      this.owed.shift();
     }
   }
 
-  private async checkpoint(): Promise<void> {
+  private async fulfil(obligation: Obligation): Promise<void> {
     const commands = this.commands();
-    await this.options.contract.checkpoint(this.life.life_id, commands.length, await commandsHash(commands, commands.length));
-  }
-
-  /** Draws once per pending key decision; a retry at the same step returns the same draw from the chain. */
-  private async drawIfKeyDecision(): Promise<void> {
-    const category = this.state.phase === "choice" && this.state.pendingEventId ? keyDecisionCategory(this.state.pendingEventId) : null;
-    if (!category) return;
-    const commands = this.commands();
-    const step = commands.length;
-    // Already drawn here, or a filled draw at step - 1 inserted the influence this decision is still waiting on.
-    if (this.life.draws.some(draw => draw.step === step || (draw.token_id !== null && draw.step === step - 1))) return;
+    const hash = await commandsHash(commands, obligation.step);
+    if (obligation.kind === "checkpoint") {
+      await this.options.contract.checkpoint(this.life.life_id, obligation.step, hash);
+      if (!this.life.checkpoints.some(c => c.step === obligation.step)) {
+        this.life = { ...this.life, checkpoints: [...this.life.checkpoints, { step: obligation.step, commands_hash: hash }] };
+      }
+      return;
+    }
     this.pendingDraw = true;
     try {
-      const draw = await this.options.contract.drawNpc(this.life.life_id, step, category, await commandsHash(commands, step));
-      this.lastDraw = draw;
-      this.life = { ...this.life, draws: [...this.life.draws, draw] };
-      if (draw.token_id) {
-        this.state = this.engine.influence(this.state, applyCommand(draw, this.options.contractId));
-        this.persist();
-      }
+      this.adoptDraw(await this.options.contract.drawNpc(this.life.life_id, obligation.step, obligation.category, hash));
     } finally {
       this.pendingDraw = false;
     }
   }
 
+  private async reconcile(obligation: Obligation): Promise<boolean> {
+    let onChain: LifeView | null;
+    try { onChain = await this.options.contract.getLife(this.life.life_id); } catch { return false; }
+    if (!onChain) return false;
+    if (obligation.kind === "checkpoint") {
+      const landed = onChain.checkpoints.some(c => c.step === obligation.step);
+      if (landed) this.life = { ...this.life, checkpoints: onChain.checkpoints };
+      return landed;
+    }
+    const draw = onChain.draws.find(d => d.step === obligation.step);
+    if (draw) this.adoptDraw(draw);
+    return Boolean(draw);
+  }
+
+  private adoptDraw(draw: Draw): void {
+    this.lastDraw = draw;
+    if (!this.life.draws.some(d => d.step === draw.step)) this.life = { ...this.life, draws: [...this.life.draws, draw] };
+    if (draw.token_id) {
+      this.state = this.engine.influence(this.state, applyCommand(draw, this.options.contractId));
+      this.persist();
+    }
+  }
+
   async finish(fetcher: typeof fetch = fetch): Promise<SignedEvidence> {
     if (this.state.phase !== "ended") throw new Error("This life has not ended yet.");
+    await this.settle();
     const response = await fetcher(this.options.verifyUrl, {
       method: "POST", headers: { "content-type": "application/json" },
       body: JSON.stringify({ life_id: this.life.life_id, save: this.save() }),
@@ -202,13 +237,25 @@ export async function beginRankedSession(options: RankedSessionOptions, life: Li
   return session;
 }
 
-/** Reloads the saved progress of a ranked life that is still alive on chain. */
+/** Reloads the saved progress of a ranked life that is still alive on chain, reconciling it with the chain first. */
 export async function resumeRankedSession(options: RankedSessionOptions, lifeId: string): Promise<RankedSession> {
   const life = await options.contract.getLife(lifeId);
   if (!life || life.status !== "alive") throw new Error("This ranked life is no longer in progress.");
   const saved = (options.storage ?? browserStorage()).getItem(rankedSaveKey(lifeId));
   if (!saved) throw new Error("This device has no saved progress for this ranked life.");
-  const state = Session.engineFor(options.world).load(saved);
-  if (state.seed !== life.seed) throw new Error("The saved progress belongs to a different life.");
-  return new Session(options, life, state);
+  const engine = Session.engineFor(options.world);
+  const save = JSON.parse(saved) as SaveFile;
+  if (save.seed !== life.seed) throw new Error("The saved progress belongs to a different life.");
+  const { state, required, tracker } = rankedObligations(engine, life.figure_picks.length, save);
+  const tip = save.commands.length;
+  const met = (o: Obligation) => o.kind === "draw" ? life.draws.some(d => d.step === o.step) : life.checkpoints.some(c => c.step === o.step);
+  const unmet = required.filter(o => !met(o));
+  if (unmet.some(o => o.step < tip)) {
+    throw new Error("This life's on-chain record is incomplete, so it can't be minted. Give it up here to start a new one.");
+  }
+  // Everything owed at the tip is settled again: the contract returns a landed draw or checkpoint unchanged for the same
+  // step and hash, so a draw that landed before this device saved its effect is applied now, never drawn twice.
+  const owed = required.filter(o => o.step === tip);
+  const known = { ...life, draws: life.draws.filter(d => d.step < tip), checkpoints: life.checkpoints.filter(c => c.step < tip) };
+  return new Session(options, known, state, tracker, owed);
 }

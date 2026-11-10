@@ -7,7 +7,9 @@ import { buildEvidence } from "../../chain/evidence.ts";
 import { NPC_ACTIONS, RANKED_WORLD_VERSION, type CareerGroup } from "../../chain/ids.ts";
 import { startRankedSession } from "../../client/chain/ranked-session.ts";
 import { createServerSignerVerifier } from "../../server/ranked/verifier.ts";
-import type { Command, WorldPack } from "../../src/types.ts";
+import { createEngine } from "../../src/index.ts";
+import type { WorldPack } from "../../src/types.ts";
+import { advanceYearWithFocus, selectAutomaticChoice, type YearlyFocusId } from "../../client/yearly-focus.ts";
 import { createCliContract, createFaucetAccount } from "./cli-contract.ts";
 
 const ROOT = new URL("../../", import.meta.url);
@@ -17,6 +19,8 @@ if (!contractId) throw new Error("Set CONTRACT_ID.");
 const secret = /RANKED_VERIFIER_SECRET=([0-9a-f]{64})/.exec(readFileSync(new URL(".dev.vars", ROOT), "utf8"))?.[1];
 if (!secret) throw new Error("RANKED_VERIFIER_SECRET is missing from .dev.vars.");
 const world = JSON.parse(readFileSync(new URL("worlds/ranked/alexandria-ranked-1.json", ROOT), "utf8")) as WorldPack;
+
+const FOCUSES: readonly YearlyFocusId[] = ["study", "craft", "pottery", "study", "carving", "friends", "sculpture", "health", "study"];
 
 /** Small deterministic PRNG so each genesis life explores different choices. */
 function chooser(seed: number): (n: number) => number {
@@ -35,11 +39,19 @@ async function genesisLife(index: number, stamp: number): Promise<string> {
     contract, contractId, verifyUrl: "in-process", world,
     storage: { getItem: k => items.get(k) ?? null, setItem: (k, v) => void items.set(k, v), removeItem: k => void items.delete(k) },
   });
+  // Play like a player: a yearly focus builds skills and work; decisions use Auto mode's safe pick, with some variety.
   const pick = chooser(stamp + index * 7919);
-  for (let i = 0; i < 20_000 && session.state.phase !== "ended"; i++) {
-    const choices = session.choices();
-    const command: Command = session.state.phase === "choice" ? { type: "choose", choice: choices[pick(choices.length)].id } : { type: "advance" };
-    await session.dispatch(command);
+  const focus = FOCUSES[(index - 1) % FOCUSES.length];
+  const engine = createEngine(world);
+  for (let i = 0; i < 5_000 && session.state.phase !== "ended"; i++) {
+    const state = session.state;
+    if (state.phase === "choice") {
+      const choices = engine.getChoices(state);
+      const safe = selectAutomaticChoice(choices, world, state);
+      await session.sync(engine.choose(state, (pick(10) < 7 && safe ? safe : choices[pick(choices.length)]).id));
+    } else {
+      await session.sync(advanceYearWithFocus(engine, state, focus));
+    }
   }
   const verifier = await createServerSignerVerifier({ secretHex: secret!, contractId, buildEvidence, loadWorld: v => (v === RANKED_WORLD_VERSION ? world : null) });
   const life = await contract.getLife(session.life.life_id);

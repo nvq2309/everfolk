@@ -1,5 +1,6 @@
 import { sha256Hex } from "../../chain/hash.ts";
 import type { Evidence, LifeView } from "../../chain/types.ts";
+import { checkRankedObligations } from "../../chain/ranked-rules.ts";
 import { validateRankedSave } from "../../chain/validate-ranked.ts";
 import { createEngine } from "../../src/index.ts";
 import { canonicalJson } from "../../src/random.ts";
@@ -43,12 +44,10 @@ export async function createServerSignerVerifier(options: {
       if (!world) throw new VerificationError("This world version is not supported by the verifier.");
       const engine = createEngine(world);
       if (save.worldFingerprint !== engine.fingerprint) throw new VerificationError("This save was played on different world content.");
-      let state: LifeState;
-      try {
-        state = engine.replay(save.seed, save.commands);
-      } catch (error) {
-        throw new VerificationError(`This life could not be replayed: ${error instanceof Error ? error.message : "unknown error"}`);
-      }
+      // Step by step: every key decision drawn in its category, no draw elsewhere, every five-year checkpoint posted.
+      const replay = checkRankedObligations(engine, life, save);
+      if (!replay.ok) throw new VerificationError(replay.reason);
+      const state: LifeState = replay.state;
       if (state.phase !== "ended") throw new VerificationError("This life has not ended yet.");
       const evidence = await options.buildEvidence({ life, save, state, worldFingerprint: engine.fingerprint });
       const evidenceJson = canonicalJson(evidence);
