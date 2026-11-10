@@ -88,9 +88,10 @@ const euclidToken = bobMint.result.token_id;
 say(`4. ${bob}'s Euclid keeps "Open a school"; ${carol} is born into that world.`);
 await callMethod(bob, contractId, "set_action", { token_id: euclidToken, action_id: "euclid.school" });
 const carolLife = await playPath(carol, "letters", s => s.state.age >= 14);
-const picked = carolLife.life.figure_picks.find(p => p.token_id === euclidToken);
-const school = carolLife.state.journal.find(entry => entry.type === "event" && (entry as { source?: { tokenId: string } }).source?.tokenId === euclidToken);
-console.log(`   born with Euclid: ${Boolean(picked)}; school reached her: ${school ? `age ${school.age} — ${school.text.slice(0, 90)}` : "not yet"}`);
+// One copy per figure shapes each life, chosen by Affection; on a re-run an earlier Euclid may be the one picked.
+const picked = carolLife.life.figure_picks.find(p => p.figure_id === "euclid");
+const school = picked && carolLife.state.journal.find(entry => entry.type === "event" && (entry as { source?: { tokenId: string } }).source?.tokenId === picked.token_id);
+console.log(`   born with Euclid (copy #${picked?.token_id ?? "none"}${picked?.token_id === euclidToken ? ", Bob's" : ""}): ${Boolean(picked)}; school reached her: ${school ? `age ${school.age} — ${school.text.slice(0, 90)}` : "not yet"}`);
 
 say(`5. ${bob} lists Euclid; ${dave} buys it; ${alice} earns again as a source.`);
 const before = BigInt(await viewMethod<string>(contractId, "balance_of", { account_id: alice }));
