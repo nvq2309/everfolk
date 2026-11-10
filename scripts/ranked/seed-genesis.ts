@@ -48,6 +48,12 @@ async function genesisLife(index: number, stamp: number): Promise<string> {
 }
 
 const stamp = Math.floor(Date.now() / 1000);
-const results = await Promise.allSettled(Array.from({ length: count }, (_, i) => genesisLife(i + 1, stamp)));
-for (const result of results) console.log(result.status === "fulfilled" ? `✓ ${result.value}` : `✗ ${(result.reason as Error).message}`);
-if (results.some(r => r.status === "rejected")) process.exitCode = 1;
+// One life at a time: the public testnet RPC rate-limits parallel signers.
+for (let i = 1; i <= count; i++) {
+  try {
+    console.log(`✓ ${await genesisLife(i, stamp)}`);
+  } catch (error) {
+    console.log(`✗ life ${i}: ${(error as Error).message.slice(0, 300)}`);
+    process.exitCode = 1;
+  }
+}

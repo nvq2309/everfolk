@@ -8,9 +8,21 @@ const run = promisify(execFile);
 const NEAR_CLI = ["-y", "near-cli-rs@0.31.1"];
 const NETWORK = ["network-config", "testnet"];
 
+const RATE_LIMITED = /rate limit|429|too many requests/i;
+const MAX_ATTEMPTS = 6;
+
+/** Public testnet RPC rate-limits bursts; those failures happen before a transaction is sent, so retrying is safe. */
 async function cli(args: string[]): Promise<string> {
-  const { stdout } = await run("npx", [...NEAR_CLI, ...args], { maxBuffer: 64 * 1024 * 1024 });
-  return stdout;
+  for (let attempt = 1; ; attempt++) {
+    try {
+      const { stdout } = await run("npx", [...NEAR_CLI, ...args], { maxBuffer: 64 * 1024 * 1024 });
+      return stdout;
+    } catch (error) {
+      const text = `${(error as { stderr?: string }).stderr ?? ""}${(error as Error).message}`;
+      if (attempt >= MAX_ATTEMPTS || !RATE_LIMITED.test(text)) throw error;
+      await new Promise(resolve => setTimeout(resolve, 2_000 * 2 ** attempt));
+    }
+  }
 }
 
 /** near-cli-rs prints the JSON return value on stdout, sometimes after a banner line. */
