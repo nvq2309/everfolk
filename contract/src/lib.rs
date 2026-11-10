@@ -2,6 +2,7 @@
 mod admin;
 mod lives;
 mod random;
+mod shares;
 mod types;
 
 use near_sdk::store::LookupMap;
