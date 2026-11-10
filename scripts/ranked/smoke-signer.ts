@@ -3,24 +3,11 @@
 //      node scripts/ranked/smoke-signer.ts sign <pem-file> <life_id> <seed_hex> <account_id> [matched_figure ...]
 import { createPrivateKey, generateKeyPairSync, sign, type KeyObject } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
+import { base58 } from "../../chain/base58.ts";
 import { RANKED_WORLD_VERSION } from "../../chain/ids.ts";
 import { canonicalJson } from "../../src/random.ts";
 
-const ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
-
-export function base58(bytes: Uint8Array): string {
-  let value = BigInt(`0x${Buffer.from(bytes).toString("hex") || "0"}`);
-  let out = "";
-  while (value > 0n) {
-    out = ALPHABET[Number(value % 58n)] + out;
-    value /= 58n;
-  }
-  for (const byte of bytes) {
-    if (byte !== 0) break;
-    out = `1${out}`;
-  }
-  return out;
-}
+export { base58 };
 
 export function newSigningKey(): KeyObject {
   return generateKeyPairSync("ed25519").privateKey;
