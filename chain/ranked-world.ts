@@ -1,3 +1,4 @@
+import { figureMediaUrl } from "./figure-media.ts";
 import type { WorldPack } from "../src/types.ts";
 import { FIGURES, INFLUENCES } from "./catalog/index.ts";
 import { FIGURE_ACTIONS, FIGURE_IDS, NPC_ACTIONS, RANKED_WORLD_VERSION } from "./ids.ts";
@@ -21,12 +22,12 @@ export function buildRankedWorld(base: WorldPack): WorldPack {
   return { ...structuredClone(base), id: RANKED_WORLD_ID, version: RANKED_WORLD_PACK_VERSION, influences: structuredClone([...INFLUENCES]) };
 }
 
-export function buildContractCatalog(): ContractCatalog {
+export function buildContractCatalog(mediaBaseUrl?: string): ContractCatalog {
   return {
     figures: FIGURE_IDS.map(id => {
       const figure = FIGURES.find(item => item.figure === id);
       if (!figure) throw new Error(`Figure ${id} has no requirement in the catalog.`);
-      return { figure_id: id, title: figure.title, media: "", supply_cap: figure.supplyCap, action_ids: [...FIGURE_ACTIONS[id]] };
+      return { figure_id: id, title: figure.title, media: figureMediaUrl(id, mediaBaseUrl), supply_cap: figure.supplyCap, action_ids: [...FIGURE_ACTIONS[id]] };
     }),
     npc_actions: Object.entries(NPC_ACTIONS).flatMap(([group, { category, actions }]) =>
       actions.map(action_id => ({ action_id, career_group: group, category }))),

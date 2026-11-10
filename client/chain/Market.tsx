@@ -1,3 +1,4 @@
+import FigureArtwork from "./FigureArtwork.tsx";
 import { useEffect, useId, useState } from "react";
 import { errorText, type ChainBackend } from "./chain-backend.ts";
 import { marketRows, type MarketRow } from "./token-page-model.ts";
@@ -31,6 +32,7 @@ export function MarketBody({ rows, busy = false, error, notice, canConnect, onCo
       : <ul className="market-grid">{rows.map(row => <li key={row.tokenId} className={`chain-card market-item${row.isFigure ? " is-figure" : ""}`}>
           <p className="chain-kicker">No. {row.tokenId}</p>
           <h2><a href={row.href}>{row.title}</a></h2>
+          <FigureArtwork figureId={row.figureId} />
           <div className="token-tags">{row.rarityLabel && <span className={`chain-tag${row.isFigure ? " is-figure" : ""}`}>{row.rarityLabel}</span>}{row.actionName && <span className="chain-tag">{row.actionName}</span>}</div>
           <p className="chain-fine">Offered by {row.seller}</p>
           <div className="market-buy">

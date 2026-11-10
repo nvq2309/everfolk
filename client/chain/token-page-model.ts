@@ -1,4 +1,4 @@
-import { FIGURE_ACTIONS, NPC_ACTIONS } from "../../chain/ids.ts";
+import { FIGURE_ACTIONS, NPC_ACTIONS, type FigureId } from "../../chain/ids.ts";
 import type { Listing, TokenExtra, TokenStats } from "../../chain/types.ts";
 import { formatYear } from "../../src/calendar.ts";
 import { actionName, actionOption, figureTitle, groupOfAction, GROUP_TITLE, rarityLabel, type ActionOption } from "./chain-copy.ts";
@@ -50,6 +50,7 @@ export interface TokenPageView {
   title: string;
   kindLabel: string;
   isFigure: boolean;
+  figureId?: FigureId | null;
   rarityLabel: string;
   affection: number;
   affectionText: string;
@@ -80,6 +81,7 @@ export function tokenPageView(input: TokenPageInput): TokenPageView {
     title: tokenTitle(extra),
     kindLabel: isFigure ? "Famous figure" : "Person of the city",
     isFigure,
+    figureId: isFigure ? extra.figure_id : null,
     rarityLabel: rarityLabel(extra.rarity),
     affection: extra.affection,
     affectionText: `Affection ${extra.affection} / 100`,
@@ -109,6 +111,7 @@ export interface MarketRow {
   href: string;
   title: string;
   isFigure: boolean;
+  figureId?: FigureId | null;
   rarityLabel: string;
   actionName: string;
   seller: string;
@@ -125,6 +128,7 @@ export function marketRows(listings: readonly Listing[], tokens: Readonly<Record
       href: chainHref({ kind: "token", tokenId: listing.token_id }),
       title: token ? tokenTitle(token.extra) : `Token #${listing.token_id}`,
       isFigure: token?.extra.kind === "figure",
+      figureId: token?.extra.kind === "figure" ? token.extra.figure_id : null,
       rarityLabel: token ? rarityLabel(token.extra.rarity) : "",
       actionName: token ? actionName(token.extra.action_id) : "",
       seller: listing.seller_id,

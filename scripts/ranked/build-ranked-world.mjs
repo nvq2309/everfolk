@@ -13,5 +13,5 @@ const { fingerprint } = createEngine(world);
 const worldFile = new URL("worlds/ranked/alexandria-ranked-1.json", root);
 mkdirSync(new URL("./", worldFile), { recursive: true });
 writeFileSync(worldFile, `${JSON.stringify(world, null, 2)}\n`);
-writeFileSync(new URL("chain/catalog/contract-catalog.json", root), `${JSON.stringify(buildContractCatalog(), null, 2)}\n`);
+writeFileSync(new URL("chain/catalog/contract-catalog.json", root), `${JSON.stringify(buildContractCatalog(process.env.FIGURE_MEDIA_BASE_URL), null, 2)}\n`);
 console.log(`Wrote ${world.id}-${world.version} (${fingerprint}) and the contract catalog.`);
