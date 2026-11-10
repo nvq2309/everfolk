@@ -98,6 +98,10 @@ export function createCliContract(contractId: string, accountId: string): LivesC
     async withdraw() { await callMethod(accountId, contractId, "withdraw", {}); },
     balanceOf: async account => (await viewMethod<string>(contractId, "balance_of", { account_id: account })),
     token: unsupported("token"),
+    async tokensOf(owner) {
+      const tokens = await viewMethod<{ token_id: string; owner_id: string; metadata: { extra: string } }[]>(contractId, "nft_tokens_for_owner", { account_id: owner });
+      return tokens.map(t => ({ token_id: t.token_id, owner_id: t.owner_id, extra: JSON.parse(t.metadata.extra) }));
+    },
     tokenStats: tokenId => viewMethod(contractId, "token_stats", { token_id: tokenId }),
     childrenOf: tokenId => viewMethod(contractId, "children_of", { token_id: tokenId, from_index: 0, limit: 100 }),
     async list(tokenId, priceYocto) { await callMethod(accountId, contractId, "list", { token_id: tokenId, price: priceYocto }, "1 yoctoNEAR"); },

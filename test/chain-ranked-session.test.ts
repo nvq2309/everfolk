@@ -264,3 +264,23 @@ test("resume applies a draw that landed on chain but was never saved on this dev
   const result = checkRankedObligations(createEngine(world), life, JSON.parse(resumed.save()) as SaveFile);
   assert.equal(result.ok, true, result.ok ? "" : result.reason);
 });
+
+test("a mint that landed on chain but failed on the client still returns the minted token", async () => {
+  const contract = createMockContract({ nobodyWeightBps: 5000 });
+  const storage = memoryStorage();
+  const session = await startRankedSession({ contract, contractId: CONTRACT, verifyUrl: "x", world, storage });
+  await playUntil(session, () => false, 20_000);
+  const { createServerSignerVerifier } = await import("../server/ranked/verifier.ts");
+  const { buildEvidence } = await import("../chain/evidence.ts");
+  const verifier = await createServerSignerVerifier({ secretHex: "07".repeat(32), contractId: CONTRACT, buildEvidence, loadWorld: () => world });
+  const signed = await verifier.verify((await contract.getLife(session.life.life_id))!, JSON.parse(session.save()) as SaveFile);
+  const flakyMint = Object.create(contract) as typeof contract;
+  flakyMint.mintLife = async (...args) => { await contract.mintLife(...args); throw new Error("Transaction has not finished yet"); };
+  (session as unknown as { options: { contract: typeof contract } }).options.contract = flakyMint;
+  const action = { letters: "letters.teach", military: "military.mentor", commerce: "commerce.credit", craft: "craft.apprentice", sky: "sky.omen", performance: "performance.lift" }[signed.evidence.career_group];
+  const result = await session.mint(signed, action);
+  assert.ok(result.token_id);
+  const token = await contract.token(result.token_id);
+  assert.equal(token?.extra.life_id, session.life.life_id);
+  assert.equal(storage.getItem(`everfolk.ranked.${session.life.life_id}`), null, "the local save is cleared once minted");
+});

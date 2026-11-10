@@ -125,6 +125,12 @@ export function createLivesContract(wallet: WalletSession, cfg: ChainConfig, dep
       assertTokenId(tokenId);
       return parseTokenView(await view("nft_token", { token_id: tokenId }));
     },
+    async tokensOf(owner) {
+      assertAccountId(owner);
+      const tokens = await view("nft_tokens_for_owner", { account_id: owner, from_index: "0", limit: 100 });
+      if (!Array.isArray(tokens)) throw new Error("The contract returned an unexpected token list.");
+      return tokens.map(token => ({ token_id: String((token as { token_id: unknown }).token_id), ...parseTokenView(token)! }));
+    },
     async tokenStats(tokenId) {
       assertTokenId(tokenId);
       return parseTokenStats(await view("token_stats", { token_id: tokenId }));

@@ -206,9 +206,26 @@ class Session implements RankedSession {
   }
 
   async mint(signed: SignedEvidence, npcActionId: string): Promise<MintResult> {
-    const result = await this.options.contract.mintLife(this.life.life_id, signed, npcActionId);
+    let result: MintResult;
+    try {
+      result = await this.options.contract.mintLife(this.life.life_id, signed, npcActionId);
+    } catch (error) {
+      // The wallet or RPC may fail after the mint landed: if so, find the token instead of asking for a second mint.
+      const minted = await this.findMinted().catch(() => null);
+      if (!minted) throw error;
+      result = minted;
+    }
     this.storage.removeItem(rankedSaveKey(this.life.life_id));
     return result;
+  }
+
+  private async findMinted(): Promise<MintResult | null> {
+    const life = await this.options.contract.getLife(this.life.life_id);
+    if (life?.status !== "minted") return null;
+    const token = (await this.options.contract.tokensOf(this.life.account_id)).find(t => t.extra.life_id === this.life.life_id);
+    if (!token) return null;
+    const { kind, figure_id, rarity, affection } = token.extra;
+    return { token_id: token.token_id, kind, figure_id, rarity, affection };
   }
 
   async abandon(): Promise<void> {

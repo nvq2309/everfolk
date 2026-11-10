@@ -31,6 +31,8 @@ export interface LivesContract {
   withdraw(): Promise<void>;
   balanceOf(account: string): Promise<string>;
   token(tokenId: string): Promise<TokenView | null>;
+  /** Tokens owned by `account` (NEP-181), newest last. */
+  tokensOf(account: string): Promise<(TokenView & { token_id: string })[]>;
   tokenStats(tokenId: string): Promise<TokenStats>;
   childrenOf(tokenId: string): Promise<string[]>;
   list(tokenId: string, priceYocto: string): Promise<void>;

@@ -207,6 +207,10 @@ function bind(state: MockState, account: string): MockLivesContract {
       const token = state.tokens.get(tokenId);
       return token ? { owner_id: token.owner_id, extra: copy(token.extra) } : null;
     },
+    async tokensOf(owner) {
+      return [...state.tokens.entries()].filter(([, token]) => token.owner_id === owner)
+        .map(([token_id, token]) => ({ token_id, owner_id: token.owner_id, extra: copy(token.extra) }));
+    },
     async tokenStats(tokenId) {
       const stats = state.stats.get(tokenId);
       return { lives_influenced: stats?.lives_influenced ?? 0, earned: (stats?.earned ?? 0n).toString() };
