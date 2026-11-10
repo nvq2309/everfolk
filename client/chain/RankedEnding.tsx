@@ -5,6 +5,7 @@ import { errorText } from "./chain-backend.ts";
 import LifeReport from "./LifeReport.tsx";
 import { lifeReport, lifeSpanLine, mintRevealView, npcActionMenu } from "./life-report-model.ts";
 import MintReveal from "./MintReveal.tsx";
+import DeclineChoice from "./DeclineChoice.tsx";
 import { DEFAULT_MINT_FEE_YOCTO, formatNear } from "./near-amount.ts";
 import type { LivesContract, SignedEvidence } from "./types.ts";
 
@@ -13,6 +14,7 @@ export interface RankedEndingSession {
   life: LifeView;
   finish(): Promise<SignedEvidence>;
   mint(signed: SignedEvidence, npcActionId: string): Promise<MintResult>;
+  abandon(): Promise<void>;
 }
 
 export interface RankedEndingProps {
@@ -22,7 +24,10 @@ export interface RankedEndingProps {
   onClose(): void;
 }
 
-type Stage = { kind: "verifying" } | { kind: "failed"; error: string } | { kind: "report"; signed: SignedEvidence } | { kind: "revealed"; result: MintResult; signed: SignedEvidence };
+type Stage = { kind: "verifying" } | { kind: "failed"; error: string } | { kind: "report"; signed: SignedEvidence } | { kind: "declining"; signed: SignedEvidence } | { kind: "revealed"; result: MintResult; signed: SignedEvidence };
+
+/** Matches the contract's default `abandon_cooldown_ms`. */
+const COOLDOWN_MINUTES = 10;
 
 async function ownersOf(contract: LivesContract, tokenIds: readonly string[]): Promise<OwnersByToken> {
   const entries = await Promise.all(tokenIds.map(async id => [id, (await contract.token(id).catch(() => null))?.owner_id] as const));
@@ -58,6 +63,14 @@ export default function RankedEnding({ session, contract, feeYocto = DEFAULT_MIN
     finally { setBusy(false); }
   }
 
+  async function closeLife() {
+    setBusy(true);
+    setError("");
+    try { await session.abandon(); onClose(); }
+    catch (cause) { setError(errorText(cause, "This life could not be closed. Please try again.")); }
+    finally { setBusy(false); }
+  }
+
   if (stage.kind === "verifying") return <p className="chain-loading" role="status">Checking your life against its record…</p>;
   if (stage.kind === "failed") return <section className="chain-card">
     <h1 tabIndex={-1}>We couldn't check this life</h1>
@@ -65,6 +78,8 @@ export default function RankedEnding({ session, contract, feeYocto = DEFAULT_MIN
     <div className="chain-actions"><button className="chain-primary" type="button" onClick={() => { setStage({ kind: "verifying" }); setAttempt(value => value + 1); }}>Try again<span aria-hidden="true">→</span></button><button className="chain-secondary" type="button" onClick={onClose}>Back to Everfolk</button></div>
   </section>;
   const evidence = stage.signed.evidence;
+  if (stage.kind === "declining") return <DeclineChoice cooldownMinutes={COOLDOWN_MINUTES} busy={busy} error={error}
+    onKeep={onClose} onClose={() => { void closeLife(); }} onBack={() => { setError(""); setStage({ kind: "report", signed: stage.signed }); }} />;
   if (stage.kind === "revealed") return <MintReveal view={mintRevealView(stage.result, evidence.career_group)} affection={stage.result.affection} onClose={onClose} />;
   return <LifeReport
     report={lifeReport({ life: session.life, sources: evidence.sources, owners })}
@@ -76,6 +91,6 @@ export default function RankedEnding({ session, contract, feeYocto = DEFAULT_MIN
     error={error}
     onSelectAction={setSelected}
     onMint={() => { void mint(stage.signed); }}
-    onDecline={onClose}
+    onDecline={() => { setError(""); setStage({ kind: "declining", signed: stage.signed }); }}
   />;
 }

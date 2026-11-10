@@ -24,6 +24,7 @@ const { default: LifeReport } = await import("../client/chain/LifeReport.tsx");
 const { default: MintReveal } = await import("../client/chain/MintReveal.tsx");
 const { TokenPageBody } = await import("../client/chain/TokenPage.tsx");
 const { MarketBody } = await import("../client/chain/Market.tsx");
+const { default: DeclineChoice } = await import("../client/chain/DeclineChoice.tsx");
 hooks.deregister();
 
 const noop = () => {};
@@ -92,4 +93,12 @@ test("market lists offers with a buy button for others", () => {
   assert.match(html, /Scholar of Alexandria/);
   assert.match(html, />Buy</);
   assert.match(renderToStaticMarkup(createElement(MarketBody, { rows: [], onBuy: noop })), /Nothing is for sale right now/);
+});
+
+test("declining a mint offers to keep the life for later or close it, and says what closing costs", () => {
+  const html = renderToStaticMarkup(createElement(DeclineChoice, { cooldownMinutes: 10, onKeep: noop, onClose: noop, onBack: noop }));
+  assert.match(html, /Keep it for later/);
+  assert.match(html, /Close this life/);
+  assert.match(html, /10 minutes/);
+  assert.match(html, /Ranked life/);
 });

@@ -431,7 +431,7 @@ function App({ isAdmin = false, onChooseWorld, onNewLife, onImportedLife, worldP
             </div>)}
           </div>
           <button className="secondary-button character-open" disabled={!game.hasRevealedStats} onClick={() => { setCharacterSection("career"); setPanel("character"); }}>Character <Icon name="arrow" size={16} /></button>
-          <button className="text-button another-life" onClick={() => setRestartOpen(true)}><Icon name="restart" size={15} /> Begin another life</button>
+          {!ranked && <button className="text-button another-life" onClick={() => setRestartOpen(true)}><Icon name="restart" size={15} /> Begin another life</button>}
         </aside>
 
         <section className="story-column" aria-label="Your life">
@@ -459,7 +459,7 @@ function App({ isAdmin = false, onChooseWorld, onNewLife, onImportedLife, worldP
               <div className="choice-list">
                   <div className="memorial-summary"><span className="eyebrow">{characterName.toLocaleUpperCase()} OF ALEXANDRIA</span>{deathCause && <p className="memorial-cause"><span>CAUSE OF DEATH</span><strong>{deathCause.title}</strong></p>}{life.deathCauseContext && <p className="death-context"><strong>{life.deathCauseKind === "condition" ? "Health history" : "What led to it"}</strong>{life.deathCauseContext}</p>}<p className="memorial-dates">{formatYear(world.startYear)} <span>—</span> {formatYear(life.year)}</p><strong>{yearsLived(life.age)}</strong>{!deathCause && <p>{ending?.kind === "chapter" ? ending.text : life.age === 0 ? "You died before your first birthday." : life.age < 18 ? "You died before reaching adulthood." : life.flags.parent ? "Your children and household are listed in the character record." : "Read the chronicle to review this life."}</p>}</div>
                   <button className="primary-button" onClick={openChronicle}>Read your life’s chronicle <Icon name="book" size={19} /></button>
-                  <button className="text-button" onClick={() => setRestartOpen(true)}>Begin another life <Icon name="arrow" size={17} /></button>
+                  {!ranked && <button className="text-button" onClick={() => setRestartOpen(true)}>Begin another life <Icon name="arrow" size={17} /></button>}
                   <SourceLinks ids={ending?.sourceIds} />
               </div>
             </section>}

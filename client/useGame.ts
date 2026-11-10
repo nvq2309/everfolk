@@ -233,6 +233,7 @@ export function useGame({ isOverlayOpen: overlayFromApp = false, startFresh = fa
   }, [hasRevealedStats, life, setPlaying]);
 
   const restart = useCallback(() => {
+    if (rankedRef.current) return; // A ranked life ends by minting or closing it, never by rerolling.
     setPlaying(false);
     setAutoDecisions(false);
     hasBegunRef.current = false;
@@ -296,7 +297,8 @@ export function useGame({ isOverlayOpen: overlayFromApp = false, startFresh = fa
   }, [hasRevealedStats, life]);
 
   useEffect(() => {
-    if (life.phase !== "ended") return;
+    // Ranked lives are kept on chain and by their session; the past-lives shelf is for free play.
+    if (life.phase !== "ended" || rankedRef.current) return;
     try { setArchivedLives(archiveLife(window.localStorage, life)); }
     catch (error) { setNotice(message(error)); }
   }, [life]);
