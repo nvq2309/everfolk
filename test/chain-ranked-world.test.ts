@@ -21,7 +21,7 @@ const contractCatalog = readJson("../chain/catalog/contract-catalog.json") as {
 
 test("every key decision id is a choice event in the ranked world", () => {
   const entries = Object.entries(keyDecisions);
-  assert.ok(entries.length >= 20 && entries.length <= 40, `${entries.length} key decisions`);
+  assert.ok(entries.length >= 20 && entries.length <= 64, `${entries.length} key decisions`);
   const influenceEvents = new Set(INFLUENCES.flatMap(entry => entry.event ? [entry.event.id] : []));
   const events = new Map(ranked.events.map(event => [event.id, event]));
   for (const [id, category] of entries) {
@@ -45,6 +45,24 @@ test("every category has at least 3 key decisions", () => {
   }
 });
 
+
+test("exclusive alternatives of a key decision draw the same category", () => {
+  const groups = new Map<string, string[]>();
+  for (const event of ranked.events) {
+    if (!event.exclusiveGroup) continue;
+    const members = groups.get(event.exclusiveGroup) ?? [];
+    members.push(event.id);
+    groups.set(event.exclusiveGroup, members);
+  }
+  for (const [group, members] of groups) {
+    const marked = members.filter(id => Object.hasOwn(keyDecisions, id));
+    if (marked.length === 0) continue;
+    const category = keyDecisions[marked[0] as keyof typeof keyDecisions];
+    for (const id of members) {
+      assert.equal(keyDecisions[id as keyof typeof keyDecisions], category, `${group} leaves ${id} out of ${category}`);
+    }
+  }
+});
 test("ranked world validates and its fingerprint is stable across builds", () => {
   assert.doesNotThrow(() => validateWorld(structuredClone(ranked)));
   assert.equal(ranked.id, "alexandria");
