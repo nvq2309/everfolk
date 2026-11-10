@@ -1,13 +1,18 @@
 //! Everfolk ranked lives: seeded births, live influence draws, verified mints and source royalties.
 mod admin;
+mod earnings;
 mod lives;
+mod mint;
 mod random;
 mod shares;
+mod tokens;
 mod types;
 
+use near_contract_standards::non_fungible_token::NonFungibleToken;
 use near_sdk::store::LookupMap;
 use near_sdk::{near, AccountId, BorshStorageKey, NearToken, PanicOnDefault};
-use types::{CatalogConfig, Life, Params, TokenRecord};
+use shares::Share;
+use types::{CatalogConfig, Life, Params, TokenRecord, TokenStats};
 
 #[near]
 #[derive(BorshStorageKey)]
@@ -18,6 +23,14 @@ enum StorageKey {
     Records,
     NpcPools,
     FigureCopies,
+    NftOwners,
+    NftMetadata,
+    NftEnumeration,
+    NftApprovals,
+    Balances,
+    Sources,
+    Children,
+    Stats,
 }
 
 #[near(contract_state)]
@@ -40,6 +53,14 @@ pub struct Contract {
     /// Figure copy token ids by figure id.
     pub(crate) figure_copies: LookupMap<String, Vec<String>>,
     pub(crate) next_token_id: u64,
+    pub(crate) nft: NonFungibleToken,
+    /// Withdrawable yoctoNEAR per account (source earnings and treasury).
+    pub(crate) balances: LookupMap<AccountId, u128>,
+    /// Source shares fixed at mint, per token.
+    pub(crate) sources: LookupMap<String, Vec<Share>>,
+    /// Reverse index: tokens this token is a source of.
+    pub(crate) children: LookupMap<String, Vec<String>>,
+    pub(crate) stats: LookupMap<String, TokenStats>,
 }
 
 #[near]
@@ -47,7 +68,7 @@ impl Contract {
     #[init]
     pub fn new(owner_id: AccountId, treasury_id: AccountId, verifier_keys: Vec<String>) -> Self {
         Self {
-            owner_id,
+            owner_id: owner_id.clone(),
             treasury_id,
             verifier_keys: admin::parse_verifier_keys(&verifier_keys),
             params: Params {
@@ -70,6 +91,17 @@ impl Contract {
             npc_pools: LookupMap::new(StorageKey::NpcPools),
             figure_copies: LookupMap::new(StorageKey::FigureCopies),
             next_token_id: 1,
+            nft: NonFungibleToken::new(
+                StorageKey::NftOwners,
+                owner_id.clone(),
+                Some(StorageKey::NftMetadata),
+                Some(StorageKey::NftEnumeration),
+                Some(StorageKey::NftApprovals),
+            ),
+            balances: LookupMap::new(StorageKey::Balances),
+            sources: LookupMap::new(StorageKey::Sources),
+            children: LookupMap::new(StorageKey::Children),
+            stats: LookupMap::new(StorageKey::Stats),
         }
     }
 }
@@ -80,3 +112,5 @@ mod test_utils;
 mod tests_admin;
 #[cfg(test)]
 mod tests_lives;
+#[cfg(test)]
+mod tests_mint;

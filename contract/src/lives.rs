@@ -1,6 +1,8 @@
 use crate::random::{block_seed, roll, weighted_pick};
 use crate::types::*;
 use crate::{Contract, ContractExt};
+use near_contract_standards::non_fungible_token::events::NftMint;
+use near_contract_standards::non_fungible_token::metadata::TokenMetadata;
 use near_sdk::json_types::U64;
 use near_sdk::{env, near, require, AccountId};
 
@@ -157,9 +159,11 @@ impl Contract {
     }
 
     /// Stores a newly minted token's game facts and adds it to the pool it can influence from.
-    pub(crate) fn register_token(&mut self, _owner: AccountId, record: TokenRecord) -> String {
+    pub(crate) fn register_token(&mut self, owner: AccountId, record: TokenRecord, metadata: TokenMetadata) -> String {
         let token_id = self.next_token_id.to_string();
         self.next_token_id += 1;
+        self.nft.internal_mint_with_refund(token_id.clone(), owner.clone(), Some(metadata), None);
+        NftMint { owner_id: &owner, token_ids: &[&token_id], memo: None }.emit();
         self.add_to_pool(&token_id, &record);
         self.records.insert(token_id.clone(), record);
         token_id

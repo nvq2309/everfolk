@@ -3,6 +3,9 @@ use crate::types::*;
 use crate::Contract;
 use ed25519_dalek::SigningKey;
 use near_sdk::test_utils::VMContextBuilder;
+use ed25519_dalek::Signer;
+use near_contract_standards::non_fungible_token::metadata::TokenMetadata;
+use near_sdk::serde_json::json;
 use near_sdk::{testing_env, AccountId, NearToken};
 
 pub const OWNER: &str = "owner.testnet";
@@ -80,6 +83,7 @@ pub fn seed_figure(c: &mut Contract, figure: &str, affection: u8, rarity: u8) ->
     c.register_token(
         account(CAROL),
         TokenRecord { kind: TokenKind::Figure, figure_id: Some(figure.into()), category: None, rarity, affection, action_id: action },
+        test_metadata(),
     )
 }
 
@@ -88,9 +92,36 @@ pub fn seed_npc(c: &mut Contract, _group: &str, category: &str, action: &str, af
     c.register_token(
         account(CAROL),
         TokenRecord { kind: TokenKind::Npc, figure_id: None, category: Some(category.into()), rarity, affection, action_id: action.into() },
+        test_metadata(),
     )
 }
 
 fn npc(action: &str, group: &str, category: &str) -> NpcActionConfig {
     NpcActionConfig { action_id: action.into(), career_group: group.into(), category: category.into() }
+}
+
+pub fn test_metadata() -> TokenMetadata {
+    TokenMetadata { title: Some("Seeded".into()), ..Default::default() }
+}
+
+/// Evidence JSON as the verifier would produce it for `life_id`.
+pub fn evidence_json(life_id: u64, account_id: &str, sources: &[(String, u64)], matched: &[&str], group: &str, bonds: i64) -> String {
+    json!({
+        "v": 1, "life_id": life_id.to_string(), "account_id": account_id, "world_version": "alexandria-ranked-1",
+        "world_fingerprint": "f".repeat(64), "save_hash": "a".repeat(64),
+        "stats": { "health": 40, "knowledge": 70, "wealth": 20, "bonds": bonds },
+        "skills": { "literacy": 80 }, "origin_id": "clerk-household", "peak_job_id": "copyist",
+        "accomplishments": [{ "id": "first-copy", "age": 19 }], "death_age": 61, "birth_year": -350, "death_year": -289,
+        "career_group": group, "matched_figures": matched,
+        "sources": sources.iter().map(|(t, i)| json!({ "token_id": t, "impact": i })).collect::<Vec<_>>(),
+    })
+    .to_string()
+}
+
+pub fn sign(evidence: &str) -> String {
+    hex::encode(verifier().sign(evidence.as_bytes()).to_bytes())
+}
+
+pub fn pay(caller: &str, near: u128) {
+    context(caller, START_MS, NearToken::from_near(near), [5; 32]);
 }

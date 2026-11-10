@@ -1,5 +1,7 @@
 use near_sdk::json_types::{U128, U64};
+use crate::shares::Share;
 use near_sdk::{near, AccountId};
+use std::collections::HashMap;
 
 pub const MAX_BPS: u16 = 10_000;
 
@@ -139,4 +141,75 @@ impl LifeView {
             started_at_ms: life.started_at_ms,
         }
     }
+}
+
+#[near(serializers = [json])]
+#[derive(Clone, Debug, PartialEq)]
+pub struct SourceImpact {
+    pub token_id: String,
+    pub impact: u64,
+}
+
+#[near(serializers = [json])]
+#[derive(Clone, Debug, PartialEq)]
+pub struct Accomplishment {
+    pub id: String,
+    pub age: u32,
+}
+
+/// What the verifier attests after replaying a ranked life. Signed as the exact JSON string received.
+#[near(serializers = [json])]
+#[derive(Clone, Debug, PartialEq)]
+pub struct Evidence {
+    pub v: u8,
+    pub life_id: String,
+    pub account_id: AccountId,
+    pub world_version: String,
+    pub world_fingerprint: String,
+    pub save_hash: String,
+    pub stats: HashMap<String, f64>,
+    pub skills: HashMap<String, f64>,
+    pub origin_id: String,
+    pub peak_job_id: Option<String>,
+    pub accomplishments: Vec<Accomplishment>,
+    pub death_age: u32,
+    pub birth_year: i32,
+    pub death_year: i32,
+    pub career_group: String,
+    pub matched_figures: Vec<String>,
+    pub sources: Vec<SourceImpact>,
+}
+
+#[near(serializers = [json])]
+#[derive(Clone, Debug, PartialEq)]
+pub struct MintResult {
+    pub token_id: String,
+    pub kind: TokenKind,
+    pub figure_id: Option<String>,
+    pub rarity: u8,
+    pub affection: u8,
+}
+
+/// Stored as JSON in NEP-177 `extra`; mirrors `TokenExtra` in chain/types.ts.
+#[near(serializers = [json])]
+#[derive(Clone, Debug, PartialEq)]
+pub struct TokenExtra {
+    pub kind: TokenKind,
+    pub figure_id: Option<String>,
+    pub rarity: u8,
+    pub affection: u8,
+    pub action_id: String,
+    pub life_id: String,
+    pub birth_year: i32,
+    pub death_year: i32,
+    pub career_group: String,
+    pub sources: Vec<Share>,
+    pub evidence_hash: String,
+}
+
+#[near(serializers = [json, borsh])]
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct TokenStats {
+    pub lives_influenced: u32,
+    pub earned: U128,
 }
