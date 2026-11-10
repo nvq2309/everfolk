@@ -168,6 +168,8 @@ impl Contract {
         payout.into_iter().map(|(account, amount)| (account, U128(amount))).collect()
     }
 
-    /// Called before any ownership change; the market (A6) clears listings here.
-    pub(crate) fn on_transfer(&mut self, _token_id: &str) {}
+    /// Called before any ownership change: a listing never survives a transfer.
+    pub(crate) fn on_transfer(&mut self, token_id: &str) {
+        self.listings.remove(token_id);
+    }
 }

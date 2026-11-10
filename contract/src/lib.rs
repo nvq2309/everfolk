@@ -2,6 +2,7 @@
 mod admin;
 mod earnings;
 mod lives;
+mod market;
 mod mint;
 mod nft;
 mod random;
@@ -10,7 +11,7 @@ mod tokens;
 mod types;
 
 use near_contract_standards::non_fungible_token::NonFungibleToken;
-use near_sdk::store::LookupMap;
+use near_sdk::store::{IterableMap, LookupMap};
 use near_sdk::{near, AccountId, BorshStorageKey, NearToken, PanicOnDefault};
 use shares::Share;
 use types::{CatalogConfig, Life, Params, TokenRecord, TokenStats};
@@ -32,6 +33,7 @@ enum StorageKey {
     Sources,
     Children,
     Stats,
+    Listings,
 }
 
 #[near(contract_state)]
@@ -62,6 +64,7 @@ pub struct Contract {
     /// Reverse index: tokens this token is a source of.
     pub(crate) children: LookupMap<String, Vec<String>>,
     pub(crate) stats: LookupMap<String, TokenStats>,
+    pub(crate) listings: IterableMap<String, market::Listing>,
 }
 
 #[near]
@@ -103,6 +106,7 @@ impl Contract {
             sources: LookupMap::new(StorageKey::Sources),
             children: LookupMap::new(StorageKey::Children),
             stats: LookupMap::new(StorageKey::Stats),
+            listings: IterableMap::new(StorageKey::Listings),
         }
     }
 }
@@ -117,3 +121,5 @@ mod tests_lives;
 mod tests_mint;
 #[cfg(test)]
 mod tests_nft;
+#[cfg(test)]
+mod tests_market;

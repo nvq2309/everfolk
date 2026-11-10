@@ -45,25 +45,34 @@ impl Contract {
         self.nft.owner_by_id.get(&token_id.to_string()).unwrap_or_else(|| env::panic_str("Token not found"))
     }
 
-    /// Splits the sources' part of a mint fee by impact, credits each source's current owner, and sends the rest to treasury.
+    /// Records a newly minted token's sources and pays them their part of the mint fee; the rest goes to treasury.
     pub(crate) fn pay_sources(&mut self, child: &str, fee: u128, shares: &[Share]) {
         self.sources.insert(child.to_string(), shares.to_vec());
-        let source_part = bps_of(fee, self.params.source_mint_share_bps);
-        let (parts, _) = split_amount(source_part, shares);
-        let mut paid = 0;
-        for (token_id, amount) in parts {
-            let owner = self.owner_of(&token_id);
-            self.credit(&owner, amount);
-            paid += amount;
-            let mut stats = self.token_stats(token_id.clone());
+        for share in shares {
+            let mut stats = self.token_stats(share.token_id.clone());
             stats.lives_influenced += 1;
-            stats.earned = U128(stats.earned.0 + amount);
-            self.stats.insert(token_id.clone(), stats);
-            let mut children = self.children.get(&token_id).cloned().unwrap_or_default();
+            self.stats.insert(share.token_id.clone(), stats);
+            let mut children = self.children.get(&share.token_id).cloned().unwrap_or_default();
             children.push(child.to_string());
-            self.children.insert(token_id, children);
+            self.children.insert(share.token_id.clone(), children);
         }
+        let paid = self.credit_sources(shares, bps_of(fee, self.params.source_mint_share_bps));
         let treasury = self.treasury_id.clone();
         self.credit(&treasury, fee - paid);
+    }
+
+    /// Splits `amount` by shares, credits each source token's current owner, and returns what was paid out.
+    pub(crate) fn credit_sources(&mut self, shares: &[Share], amount: u128) -> u128 {
+        let (parts, _) = split_amount(amount, shares);
+        let mut paid = 0;
+        for (token_id, part) in parts {
+            let owner = self.owner_of(&token_id);
+            self.credit(&owner, part);
+            paid += part;
+            let mut stats = self.token_stats(token_id.clone());
+            stats.earned = U128(stats.earned.0 + part);
+            self.stats.insert(token_id, stats);
+        }
+        paid
     }
 }
