@@ -20,6 +20,8 @@ export interface RankedSessionOptions {
   verifyUrl: string;
   world: WorldPack;
   storage?: SessionStorage;
+  /** Practice ledger only: check and sign the finished life in the browser instead of on the server. */
+  verifyLocally?: (life: LifeView, save: SaveFile) => Promise<SignedEvidence>;
 }
 
 /** A ranked life: every step is saved, key decisions draw on chain, and there is no way to rewind. */
@@ -196,6 +198,7 @@ class Session implements RankedSession {
   async finish(fetcher: typeof fetch = fetch): Promise<SignedEvidence> {
     if (this.state.phase !== "ended") throw new Error("This life has not ended yet.");
     await this.settle();
+    if (this.options.verifyLocally) return this.options.verifyLocally(this.life, JSON.parse(this.save()) as SaveFile);
     const response = await fetcher(this.options.verifyUrl, {
       method: "POST", headers: { "content-type": "application/json" },
       body: JSON.stringify({ life_id: this.life.life_id, save: this.save() }),

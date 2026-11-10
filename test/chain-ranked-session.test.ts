@@ -284,3 +284,28 @@ test("a mint that landed on chain but failed on the client still returns the min
   assert.equal(token?.extra.life_id, session.life.life_id);
   assert.equal(storage.getItem(`everfolk.ranked.${session.life.life_id}`), null, "the local save is cleared once minted");
 });
+
+test("practice mode checks and signs a finished life in the browser, without the server", async () => {
+  const { practiceVerifier } = await import("../client/chain/practice-verifier.ts");
+  const contract = createMockContract({ nobodyWeightBps: 5000 });
+  const session = await startRankedSession({ contract, contractId: CONTRACT, verifyUrl: "unused", world, storage: memoryStorage(), verifyLocally: practiceVerifier(world, contract, CONTRACT) });
+  await playUntil(session, () => false, 20_000);
+  const signed = await session.finish((async () => { throw new Error("no server in practice mode"); }) as unknown as typeof fetch);
+  assert.equal(signed.evidence.seed, session.life.seed);
+  assert.equal(signed.signature, "0".repeat(128));
+  const group = signed.evidence.career_group;
+  const action = { letters: "letters.teach", military: "military.mentor", commerce: "commerce.credit", craft: "craft.apprentice", sky: "sky.omen", performance: "performance.lift" }[group];
+  assert.ok((await session.mint(signed, action)).token_id);
+});
+
+test("practice mode refuses a life that broke the ranked rules", async () => {
+  const { practiceVerifier } = await import("../client/chain/practice-verifier.ts");
+  const contract = createMockContract({ nobodyWeightBps: 0 });
+  const life = await contract.startLife("alexandria-ranked-1");
+  const { createEngine } = await import("../src/index.ts");
+  const engine = createEngine(world);
+  let state = engine.start(life.seed);
+  for (const pick of life.figure_picks) state = engine.influence(state, activationCommand(pick, CONTRACT));
+  for (let i = 0; i < 20_000 && state.phase !== "ended"; i++) state = state.phase === "choice" ? engine.choose(state, engine.getChoices(state)[0].id) : engine.advance(state);
+  await assert.rejects(practiceVerifier(world, contract, CONTRACT)(life, JSON.parse(engine.save(state))), /not drawn on chain/);
+});

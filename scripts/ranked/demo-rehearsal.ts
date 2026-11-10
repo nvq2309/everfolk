@@ -2,6 +2,8 @@
 //   CONTRACT_ID=demo.genesis-1794297139-6.testnet ALICE=a.testnet BOB=b.testnet CAROL=c.testnet DAVE=d.testnet \
 //     node scripts/ranked/demo-rehearsal.ts
 // Accounts must already be in ~/.near-credentials/testnet; the contract owner key too. Never run against the main contract.
+// VERIFY_URL=http://localhost:5173/api/ranked/verify verifies through a running server (and stores evidence there)
+// instead of in-process; EVIDENCE_BASE_URL sets where minted tokens link their evidence.
 import { readFileSync } from "node:fs";
 import { buildEvidence } from "../../chain/evidence.ts";
 import { matchFigures } from "../../chain/match.ts";
@@ -23,6 +25,7 @@ const secret = /RANKED_VERIFIER_SECRET=([0-9a-f]{64})/.exec(readFileSync(new URL
 if (!secret) throw new Error("RANKED_VERIFIER_SECRET is missing from .dev.vars.");
 const world = JSON.parse(readFileSync(new URL("worlds/ranked/alexandria-ranked-1.json", ROOT), "utf8")) as WorldPack;
 const engine = createEngine(world);
+const verifyUrl = process.env.VERIFY_URL;
 const verifier = await createServerSignerVerifier({ secretHex: secret, contractId, buildEvidence, loadWorld: v => (v === RANKED_WORLD_VERSION ? world : null) });
 const near = (yocto: string) => (Number(BigInt(yocto) / 10n ** 18n) / 1e6).toFixed(4);
 const say = (line: string) => console.log(`\n▶ ${line}`);
@@ -40,13 +43,16 @@ async function clearActive(account: string): Promise<void> {
 
 async function playPath(account: string, path: PathId, stop?: (s: RankedSession) => boolean): Promise<RankedSession> {
   await clearActive(account);
-  const session = await startRankedSession({ contract: createCliContract(contractId, account), contractId, verifyUrl: "in-process", world, storage: memory() });
+  const session = await startRankedSession({ contract: createCliContract(contractId, account), contractId, verifyUrl: verifyUrl ?? "in-process", world, storage: memory() });
   for (let i = 0; i < 5_000 && session.state.phase !== "ended" && !stop?.(session); i++) await session.sync(nextState(engine, session.state, path));
   return session;
 }
 
 async function mintLife(session: RankedSession, action?: string) {
-  const signed = await verifier.verify((await viewMethod<LifeView>(contractId, "get_life", { life_id: session.life.life_id })), JSON.parse(session.save()) as SaveFile);
+  const signed = verifyUrl
+    ? await session.finish()
+    : await verifier.verify((await viewMethod<LifeView>(contractId, "get_life", { life_id: session.life.life_id })), JSON.parse(session.save()) as SaveFile);
+  if (verifyUrl) console.log(`   verified by ${verifyUrl}; evidence ${(signed as { evidence_url?: string }).evidence_url ?? signed.evidence_hash}`);
   const group = signed.evidence.career_group as CareerGroup;
   const result = await session.mint(signed, action && NPC_ACTIONS[group].actions.includes(action as never) ? action : NPC_ACTIONS[group].actions[0]);
   return { signed, result };
@@ -54,7 +60,8 @@ async function mintLife(session: RankedSession, action?: string) {
 
 say(`Demo contract ${contractId}: figure drop 100%, no empty draws, no abandon wait (demo settings, disclosed).`);
 const params = await viewMethod<Record<string, unknown>>(contractId, "get_params", {});
-await callMethod(contractId, contractId, "set_params", { params: { ...params, drop_rate_bps: 10_000, nobody_weight_bps: 0, abandon_cooldown_ms: 0 } });
+const evidenceBase = process.env.EVIDENCE_BASE_URL ?? params.evidence_base_url;
+await callMethod(contractId, contractId, "set_params", { params: { ...params, drop_rate_bps: 10_000, nobody_weight_bps: 0, abandon_cooldown_ms: 0, evidence_base_url: evidenceBase } });
 
 say(`1. ${alice} lives as a copyist and mints the life.`);
 const aliceLife = await playPath(alice, "letters");

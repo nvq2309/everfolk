@@ -12,10 +12,10 @@ import ChainLayer from "./chain/ChainLayer.tsx";
 import type { ChainBackend } from "./chain/chain-backend.ts";
 import { loadRankedConfig } from "./chain/chain-backend.ts";
 import { beginRankedSession, type RankedSession } from "./chain/ranked-session.ts";
+import { PRACTICE_CONTRACT_ID, practiceVerifier } from "./chain/practice-verifier.ts";
 import type { LifeView } from "../chain/types.ts";
 import type { WorldPack } from "../src/types.ts";
 
-const PREVIEW_CONTRACT_ID = "preview.everfolk.testnet";
 
 /** Loads the ranked world only when a ranked life begins; it is large and free play never needs it. */
 async function loadRankedWorld(): Promise<WorldPack> {
@@ -48,9 +48,11 @@ export default function GameClient() {
 
   async function beginRanked(life: LifeView, backend: ChainBackend) {
     const config = backend.mode === "live" ? await loadRankedConfig() : null;
+    const world = await loadRankedWorld();
     const session = await beginRankedSession({
-      contract: backend.contract, contractId: config?.contract_id ?? PREVIEW_CONTRACT_ID,
-      verifyUrl: "/api/ranked/verify", world: await loadRankedWorld(),
+      contract: backend.contract, contractId: config?.contract_id ?? PRACTICE_CONTRACT_ID,
+      verifyUrl: "/api/ranked/verify", world,
+      ...(backend.mode === "preview" ? { verifyLocally: practiceVerifier(world, backend.contract) } : {}),
     }, life);
     setActive(keepFreePlayOnRankedStart);
     setRankedSession(session);
