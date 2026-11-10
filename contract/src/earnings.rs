@@ -1,5 +1,5 @@
-use crate::shares::{split_amount, Share};
-use crate::types::{TokenStats, MAX_BPS};
+use crate::shares::{bps_of, split_amount, Share};
+use crate::types::TokenStats;
 use crate::{Contract, ContractExt};
 use near_sdk::json_types::U128;
 use near_sdk::{env, near, require, AccountId, NearToken, Promise};
@@ -48,8 +48,7 @@ impl Contract {
     /// Splits the sources' part of a mint fee by impact, credits each source's current owner, and sends the rest to treasury.
     pub(crate) fn pay_sources(&mut self, child: &str, fee: u128, shares: &[Share]) {
         self.sources.insert(child.to_string(), shares.to_vec());
-        let source_part = fee / MAX_BPS as u128 * self.params.source_mint_share_bps as u128
-            + fee % MAX_BPS as u128 * self.params.source_mint_share_bps as u128 / MAX_BPS as u128;
+        let source_part = bps_of(fee, self.params.source_mint_share_bps);
         let (parts, _) = split_amount(source_part, shares);
         let mut paid = 0;
         for (token_id, amount) in parts {

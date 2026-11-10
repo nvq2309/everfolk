@@ -44,10 +44,16 @@ pub fn compute_shares(impacts: &[(String, u64)]) -> Vec<Share> {
     shares.into_iter().map(|(share, _)| share).collect()
 }
 
+/// `amount × bps / 10000`, rounded down, without overflowing at yocto scale.
+pub fn bps_of(amount: u128, bps: u16) -> u128 {
+    let scale = MAX_BPS as u128;
+    amount / scale * bps as u128 + amount % scale * bps as u128 / scale
+}
+
 /// Per-token amounts for `amount` split by `shares`, plus the undistributed remainder.
 pub fn split_amount(amount: u128, shares: &[Share]) -> (Vec<(String, u128)>, u128) {
     let parts: Vec<(String, u128)> =
-        shares.iter().map(|s| (s.token_id.clone(), amount / MAX_BPS as u128 * s.bps as u128 + amount % MAX_BPS as u128 * s.bps as u128 / MAX_BPS as u128)).collect();
+        shares.iter().map(|s| (s.token_id.clone(), bps_of(amount, s.bps))).collect();
     let paid: u128 = parts.iter().map(|(_, n)| n).sum();
     (parts, amount - paid)
 }

@@ -3,6 +3,7 @@ mod admin;
 mod earnings;
 mod lives;
 mod mint;
+mod nft;
 mod random;
 mod shares;
 mod tokens;
@@ -114,3 +115,5 @@ mod tests_admin;
 mod tests_lives;
 #[cfg(test)]
 mod tests_mint;
+#[cfg(test)]
+mod tests_nft;
