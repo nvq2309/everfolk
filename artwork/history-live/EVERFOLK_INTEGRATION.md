@@ -1,6 +1,10 @@
 # History-live graphics in Everfolk
 
-The skill tree, compact skill paths, life record, full chronicle and lifetime rail use the character creator's ivory paper, brown outlines, olive selection, numbered chips and hard shadows. Shared values are in `client/creator-tokens.css`. Learning uses faience and mastery uses gold. State labels and icons accompany colour.
+The skill atlas and yearly life record now follow `kvnhoag/everfolk` branch `jokerH` (source commit `dfcda18`), replacing the earlier creator-card approximation.
+
+The atlas uses branch tabs, open-source icon artwork, measured straight connections, a supplied map background, keyboard exploration and skill details. Its source icons, attribution and license are retained under `public/assets/skill-icons/open-source-v3/`.
+
+The life record shows a yearly headline and net stat/skill changes. “Full year” expands every journal entry with its individual changes and sources. A detached replay observer calculates actual clamped changes without modifying the active life, its saved format or its random state. Ranked influence commands are included in this replay. The compact skill panels and lifetime rail retain the creator's shared tokens in `client/creator-tokens.css`.
 
 Life-record influence markers name the source and deed. Famous figures use a star; people of the city use a diamond. These appear only when a journal entry has a ranked influence source.
 

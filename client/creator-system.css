@@ -29,23 +29,6 @@
 .compact-skills .compact-branch-selector select,.life-info-sidebar .compact-branch-selector select{border:1px solid var(--cr-edge);background:#fffdf4;border-radius:0}
 .compact-skills .compact-branch-selector select:focus-visible,.compact-skills button:focus-visible{outline:3px solid #648473;outline-offset:3px}
 
-/* 02 · Life record feed: creator cards, olive age chips. */
-.life-event-feed{gap:12px;margin-top:12px}
-.life-event-feed .life-event-year{grid-template-columns:76px minmax(0,1fr);column-gap:14px;padding:0;border-top:0}
-.life-event-feed .life-event-year-heading{gap:6px;padding-top:4px}
-.life-event-feed .life-event-year-heading strong{display:inline-grid;place-items:center;min-height:22px;min-width:23px;padding:2px 7px;background:var(--cr-olive);color:var(--cr-paper);font:700 10px/1.2 var(--cr-mono);letter-spacing:.6px;font-variant-numeric:tabular-nums}
-.life-event-feed .life-event-year-heading span{font:700 9px/1.4 var(--cr-mono);letter-spacing:.6px;color:var(--cr-muted)}
-.life-event-feed .life-event-rows{gap:7px}
-.life-event-feed .life-event-row{padding:9px 11px;border:1px solid var(--cr-line);background:#fffbee;box-shadow:var(--cr-hard)}
-.life-event-feed .life-event-copy p{color:var(--cr-ink);font-size:13px;line-height:1.7}
-.life-event-feed .life-event-history{border-left:3px solid var(--cr-wood-1)}
-.life-event-feed .life-event-milestone{border-left:3px solid var(--cr-olive)}
-.life-event-feed .life-event-ending{border-color:var(--cr-pottery-0);background:#fbefe6}
-.life-event-feed .life-event-ending p{color:var(--cr-pottery-0)}
-.life-event-feed .life-event-quiet{padding:8px 11px;border:1px dashed var(--cr-line);color:var(--cr-muted);font-size:12px}
-.life-event-sources summary,.life-event-sources a{color:var(--cr-olive-dark)}
-.compact-life-record .life-event-feed{padding:2px 6px 6px 2px}
-
 /* "Shaped by …": faience for people of the city, gold for famous figures. */
 .life-event-feed .life-event-row.is-faience,.life-timeline li.journal-row.is-faience{border-color:var(--cr-faience-0);box-shadow:inset 3px 0 var(--cr-faience-1),2px 2px 0 #a9c7b5}
 .life-event-feed .life-event-row.is-gold,.life-timeline li.journal-row.is-gold{border-color:var(--cr-gold-0);box-shadow:inset 3px 0 var(--cr-gold-1),2px 2px 0 #d6b874}
@@ -93,9 +76,6 @@
 .life-year-rail .life-year-stop>button:not(:disabled):hover .life-year-stop-mark{box-shadow:0 0 0 2px var(--cr-paper),0 0 0 3px var(--cr-olive)}
 .life-year-rail .life-year-stop>button:focus-visible{outline:3px solid #648473;outline-offset:2px}
 @media(max-width:600px){
-  .life-event-feed .life-event-year{grid-template-columns:58px minmax(0,1fr);column-gap:10px}
-  .life-event-feed .life-event-row{padding:8px 9px}
-  .life-event-feed .life-event-copy p{font-size:12px;line-height:1.65}
   .life-timeline ol.journal-year-entries{padding:10px}
   .life-timeline li.journal-row{padding:9px 10px;gap:9px}
   .life-timeline .journal-year-heading{padding:10px 12px}

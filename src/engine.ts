@@ -7,7 +7,7 @@ import { validateWorld } from "./validate.ts";
 import { canonicalJson, contentFingerprint, nextRandom, seedToUint32 } from "./random.ts";
 import { formatYear, yearAtAge } from "./calendar.ts";
 import { activityPartnerIds, activityReason, characterEffectReason, initialCharacter } from "./character.ts";
-import { applyEconomyEffect, financeActivityReason, initialEconomy, yearlyAssetIncome, repayDebtAutomatically } from "./economy.ts";
+import { applyEconomyEffect, financeActivityReason, initialEconomy, yearlyAssetIncome, repayDebtAutomatically, getNetWorth } from "./economy.ts";
 import { loanCollectionEventId } from "./loans.ts";
 import { initialKnowledge, recordKnowledgePractice, progressKnowledge } from "./knowledge.ts";
 import { applyStatDelta, skillEffectDelta } from "./progression.ts";
@@ -98,11 +98,30 @@ function mutableSnapshot(state: LifeState): LifeState {
   };
 }
 
-export function createEngine(input: unknown): LifeEngine {
+/** Detached telemetry for record projections; never persisted in saves. */
+export interface JournalObserver { onChange(index: number, changes: Readonly<Record<string, number>>): void }
+
+export function createEngine(input: unknown, observer?: JournalObserver): LifeEngine {
   validateWorld(input);
   // Own a detached immutable pack so the caller cannot change rules mid-life.
   const world: WorldPack = freeze(structuredClone(input));
   const fingerprint = contentFingerprint(world);
+  function observedValues(state: LifeState): Record<string, number> {
+    const result = { ...state.stats };
+    if (world.economy && state.economy) result[world.economy.stat] = getNetWorth(world, state);
+    for (const [id, value] of Object.entries(state.character?.skills ?? {})) result[`skill:${id}`] = value;
+    return result;
+  }
+  function report(state: LifeState, index: number, before: Record<string, number> | undefined): void {
+    if (!observer || !before || !state.journal[index]) return;
+    const deltas = Object.fromEntries(Object.entries(observedValues(state)).map(([id, value]) => [id, value - (before[id] ?? 0)]).filter(([, delta]) => delta !== 0));
+    if (Object.keys(deltas).length) observer.onChange(index, Object.freeze(deltas));
+  }
+  function recorded(state: LifeState, index: number | (() => number), action: () => void): void {
+    const before = observer ? observedValues(state) : undefined;
+    action();
+    report(state, typeof index === "number" ? index : index(), before);
+  }
   // Catalog events join every lane, but stay ineligible until activated.
   const influences = influenceCatalog(world);
   const allEvents = influences.events;
@@ -167,10 +186,15 @@ export function createEngine(input: unknown): LifeEngine {
   }
 
   function healthHooks(state: LifeState) {
+    const indices = new Map<string, number>();
     return {
       random: () => { const draw = nextRandom(state.rngState); state.rngState = draw.state; return draw.value; },
       matches: (condition: Condition | undefined) => matches(condition, state),
-      journal: (id: string, text: string) => journal(state, "event", id, text),
+      journal: (id: string, text: string) => { indices.set(id, state.journal.length); journal(state, "event", id, text); },
+      changes: observer ? (id: string, delta: number) => {
+        const index = indices.get(id);
+        if (index !== undefined && delta) observer.onChange(index, Object.freeze({ [world.health!.stat]: delta }));
+      } : undefined,
       support: relationshipSupport(world, state),
     };
   }
@@ -334,7 +358,7 @@ export function createEngine(input: unknown): LifeEngine {
 
   function automaticEvent(state: LifeState, event: LifeEvent, source?: InfluenceSource): void {
     recordEvent(state, event, source);
-    apply(state, event.effects ?? []);
+    recorded(state, state.journal.length - 1, () => apply(state, event.effects ?? []));
     checkEndings(state);
   }
 
@@ -620,21 +644,25 @@ export function createEngine(input: unknown): LifeEngine {
     // The interval [age, age + 1) belongs to the current completed age. A death
     // before the first birthday is therefore recorded at age zero, not age one.
     if (mortalityCheck(next)) return;
-    progressKnowledge(world, next, (id, text) => journal(next, "event", id, text));
+    recorded(next, next.journal.length, () => progressKnowledge(world, next, (id, text) => journal(next, "event", id, text)));
     next.age += 1;
     next.year = yearAtAge(world.startYear, next.age);
     journal(next, "year", `age-${next.age}`, `Age ${next.age}`);
     const annualIncome = (): void => {
       if (next.phase !== "ended" && next.character?.jobId) {
         const job = world.character!.jobs.find(candidate => candidate.id === next.character!.jobId)!;
-        apply(next, job.yearlyEffects);
-        journal(next, "activity", job.id, `You continue your work as ${job.title.toLowerCase()}.`);
+        recorded(next, () => next.journal.length - 1, () => {
+          apply(next, job.yearlyEffects);
+          journal(next, "activity", job.id, `You continue your work as ${job.title.toLowerCase()}.`);
+        });
       }
       if (next.phase !== "ended") {
         const income = yearlyAssetIncome(world, next);
         if (income > 0) {
-          apply(next, [{ type: "cash", delta: income }]);
-          journal(next, "activity", "asset-income", `Your assets bring in ${income} ${world.economy!.currency.short}.`);
+          recorded(next, () => next.journal.length - 1, () => {
+            apply(next, [{ type: "cash", delta: income }]);
+            journal(next, "activity", "asset-income", `Your assets bring in ${income} ${world.economy!.currency.short}.`);
+          });
         }
       }
     };
@@ -667,7 +695,7 @@ export function createEngine(input: unknown): LifeEngine {
     journal(next, "choice", choice.id, choice.text);
     const outcome = pick(choice.outcomes, candidate => outcomeWeight(world, next, candidate), next);
     journal(next, "outcome", outcome.id, outcome.text);
-    apply(next, outcome.effects, `${choice.text} — ${outcome.text}`, { sourceId: event.id, outcomeId: outcome.id });
+    recorded(next, next.journal.length - 1, () => apply(next, outcome.effects, `${choice.text} — ${outcome.text}`, { sourceId: event.id, outcomeId: outcome.id }));
     checkEndings(next);
     if (offerQueuedInfluence(next)) return;
     // Resolve other due scheduled events at this age, without generating extra random events.
@@ -722,7 +750,7 @@ export function createEngine(input: unknown): LifeEngine {
     journal(next, "activity", activity.id, activity.text);
     const outcome = pick(activity.outcomes, candidate => outcomeWeight(world, next, candidate), next);
     journal(next, "outcome", outcome.id, outcome.text);
-    apply(next, outcome.effects, `${activity.text} — ${outcome.text}`, { sourceId: activity.id, outcomeId: outcome.id });
+    recorded(next, next.journal.length - 1, () => apply(next, outcome.effects, `${activity.text} — ${outcome.text}`, { sourceId: activity.id, outcomeId: outcome.id }));
     checkEndings(next);
     resolveEvents(next, false);
   }
@@ -764,7 +792,7 @@ export function createEngine(input: unknown): LifeEngine {
     else {
       const index = next.journal.length, before = influenceMeasure(next);
       journal(next, "influence", entry.id, entry.label, { source: command.source, deltas: {} });
-      apply(next, scaleInfluenceEffects(entry.effects ?? [], command.power), entry.label);
+      recorded(next, index, () => apply(next, scaleInfluenceEffects(entry.effects ?? [], command.power), entry.label));
       next.journal[index] = { ...next.journal[index], deltas: influenceDeltas(before, influenceMeasure(next)) };
       checkEndings(next);
       if (entry.event && next.phase !== "ended") next.queuedInfluences = [...next.queuedInfluences ?? [], record];
