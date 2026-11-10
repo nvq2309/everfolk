@@ -110,3 +110,11 @@ test("verify still returns signed evidence when evidence storage is unavailable"
   assert.equal(body.signature, signed.signature);
   assert.equal(body.evidence_stored, false);
 });
+
+test("a save that is JSON but not a life is rejected with 400", async () => {
+  for (const save of ["null", "5", '"x"', '{"commands":"no"}', '{"seed":"ab","commands":[1]}']) {
+    const response = await handleRankedApi(post(JSON.stringify({ life_id: "5", save })), env(), { verifier: async () => fakeVerifier(signed), fetch: rpcReturning(LIFE) });
+    assert.equal(response.status, 400, save);
+    assert.match((await response.json()).error, /save file/i);
+  }
+});

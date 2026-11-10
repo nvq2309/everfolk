@@ -48,7 +48,14 @@ function parseVerifyRequest(text: string): { lifeId: string; saveJson: string; s
   if (typeof lifeId !== "string" || !/^\d{1,19}$/.test(lifeId)) throw new RouteError(400, "Send the ranked life's id.");
   if (typeof saveJson !== "string") throw new RouteError(400, "Send the life's save file.");
   if (saveJson.length > MAX_RANKED_SAVE_BYTES) throw new RouteError(413, "This life is too long to verify.");
-  try { return { lifeId, saveJson, save: JSON.parse(saveJson) as SaveFile }; } catch { throw new RouteError(400, "The save file is not valid JSON."); }
+  let save: unknown;
+  try { save = JSON.parse(saveJson); } catch { throw new RouteError(400, "The save file is not valid JSON."); }
+  const shape = save as Partial<SaveFile> | null;
+  const isLife = shape !== null && typeof shape === "object" && !Array.isArray(shape) && typeof shape.seed === "string" &&
+    typeof shape.worldId === "string" && typeof shape.worldVersion === "string" && Array.isArray(shape.commands) &&
+    shape.commands.every(command => command !== null && typeof command === "object" && typeof (command as { type?: unknown }).type === "string");
+  if (!isLife) throw new RouteError(400, "The save file is not an Everfolk life.");
+  return { lifeId, saveJson, save: save as SaveFile };
 }
 
 async function verify(request: Request, env: RankedEnvironment, deps: RankedDependencies): Promise<Response> {

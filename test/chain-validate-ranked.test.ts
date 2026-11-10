@@ -82,3 +82,23 @@ test("rejects a checkpoint beyond the end of the save", async () => {
   const short = { ...save, commands: save.commands.slice(0, 6) };
   assert.deepEqual(await validateRankedSave(life, short, CONTRACT), { ok: false, reason: "This life was changed after a recorded checkpoint." });
 });
+
+test("rejects two draws recorded at the same step", async () => {
+  const { life, save } = await fixture();
+  const twice = { ...life, draws: [life.draws[0], { ...life.draws[0] }] };
+  assert.deepEqual(await validateRankedSave(twice, save, CONTRACT), { ok: false, reason: "Two draws were recorded at the same moment." });
+});
+
+test("rejects an empty draw that carries a token", async () => {
+  const { life, save } = await fixture();
+  const odd = { ...life, draws: [...life.draws, { step: 5, category: "war" as const, token_id: null, action_id: "military.mentor", rarity: 1, commands_hash: life.draws[0].commands_hash }] };
+  assert.deepEqual(await validateRankedSave(odd, save, CONTRACT), { ok: false, reason: "A recorded influence is missing from this life." });
+});
+
+test("rejects a negative or fractional step", async () => {
+  const { life, save } = await fixture();
+  for (const step of [-1, 1.5]) {
+    const bad = { ...life, checkpoints: [{ step, commands_hash: life.checkpoints[0].commands_hash }] };
+    assert.deepEqual(await validateRankedSave(bad, save, CONTRACT), { ok: false, reason: "This life was changed after a recorded checkpoint." });
+  }
+});

@@ -32,7 +32,15 @@ export async function validateRankedSave(life: LifeView, save: SaveFile, contrac
   if (save.seed !== life.seed) return fail("This save does not belong to this ranked life.");
   if (rankedWorldVersion(save) !== life.world_version) return fail("This save was played in a different world version.");
 
+  if (!Array.isArray(save.commands)) return fail("This life was changed after a recorded checkpoint.");
   const commands = save.commands as readonly unknown[];
+  const steps = [...life.draws, ...life.checkpoints].map(record => record.step);
+  if (steps.some(step => !Number.isInteger(step) || step < 0)) return fail("This life was changed after a recorded checkpoint.");
+  const drawSteps = life.draws.map(draw => draw.step);
+  if (new Set(drawSteps).size !== drawSteps.length) return fail("Two draws were recorded at the same moment.");
+  if (life.draws.some(draw => !draw.token_id && (draw.action_id !== null || draw.rarity !== null))) {
+    return fail("A recorded influence is missing from this life.");
+  }
   const expected = new Map<number, InfluenceCommand>();
   life.figure_picks.forEach((pick, index) => expected.set(index, activationCommand(pick, contractId)));
   if (life.figure_picks.some((_, index) => !same(commands[index], expected.get(index)))) {
