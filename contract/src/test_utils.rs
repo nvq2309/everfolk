@@ -74,6 +74,23 @@ pub fn sample_catalog() -> CatalogConfig {
     }
 }
 
+/// Registers an already-minted figure copy owned by CAROL and returns its token id.
+pub fn seed_figure(c: &mut Contract, figure: &str, affection: u8, rarity: u8) -> String {
+    let action = c.get_catalog().figures.iter().find(|f| f.figure_id == figure).unwrap().action_ids[0].clone();
+    c.register_token(
+        account(CAROL),
+        TokenRecord { kind: TokenKind::Figure, figure_id: Some(figure.into()), category: None, rarity, affection, action_id: action },
+    )
+}
+
+/// Registers an already-minted NPC owned by CAROL and returns its token id.
+pub fn seed_npc(c: &mut Contract, _group: &str, category: &str, action: &str, affection: u8, rarity: u8) -> String {
+    c.register_token(
+        account(CAROL),
+        TokenRecord { kind: TokenKind::Npc, figure_id: None, category: Some(category.into()), rarity, affection, action_id: action.into() },
+    )
+}
+
 fn npc(action: &str, group: &str, category: &str) -> NpcActionConfig {
     NpcActionConfig { action_id: action.into(), career_group: group.into(), category: category.into() }
 }

@@ -1,5 +1,5 @@
-use near_sdk::json_types::U128;
-use near_sdk::near;
+use near_sdk::json_types::{U128, U64};
+use near_sdk::{near, AccountId};
 
 pub const MAX_BPS: u16 = 10_000;
 
@@ -40,4 +40,103 @@ pub struct NpcActionConfig {
 pub struct CatalogConfig {
     pub figures: Vec<FigureConfig>,
     pub npc_actions: Vec<NpcActionConfig>,
+}
+
+#[near(serializers = [json, borsh])]
+#[derive(Clone, Copy, Debug, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum LifeStatus {
+    Alive,
+    Minted,
+    Abandoned,
+}
+
+#[near(serializers = [json, borsh])]
+#[derive(Clone, Copy, Debug, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum TokenKind {
+    Figure,
+    Npc,
+}
+
+/// Game-facing facts about a minted token; ownership lives in the NFT standard state.
+#[near(serializers = [json, borsh])]
+#[derive(Clone, Debug, PartialEq)]
+pub struct TokenRecord {
+    pub kind: TokenKind,
+    pub figure_id: Option<String>,
+    pub category: Option<String>,
+    pub rarity: u8,
+    pub affection: u8,
+    pub action_id: String,
+}
+
+#[near(serializers = [json, borsh])]
+#[derive(Clone, Debug, PartialEq)]
+pub struct FigurePick {
+    pub figure_id: String,
+    pub token_id: String,
+    pub action_id: String,
+    pub rarity: u8,
+}
+
+#[near(serializers = [json, borsh])]
+#[derive(Clone, Debug, PartialEq)]
+pub struct Draw {
+    pub step: u32,
+    pub category: String,
+    pub token_id: Option<String>,
+    pub action_id: Option<String>,
+    pub rarity: Option<u8>,
+    pub commands_hash: String,
+}
+
+#[near(serializers = [json, borsh])]
+#[derive(Clone, Debug, PartialEq)]
+pub struct Checkpoint {
+    pub step: u32,
+    pub commands_hash: String,
+}
+
+#[near(serializers = [borsh])]
+#[derive(Clone, Debug, PartialEq)]
+pub struct Life {
+    pub account_id: AccountId,
+    pub seed: [u8; 32],
+    pub world_version: String,
+    pub status: LifeStatus,
+    pub figure_picks: Vec<FigurePick>,
+    pub draws: Vec<Draw>,
+    pub checkpoints: Vec<Checkpoint>,
+    pub started_at_ms: u64,
+}
+
+#[near(serializers = [json])]
+#[derive(Clone, Debug, PartialEq)]
+pub struct LifeView {
+    pub life_id: U64,
+    pub account_id: AccountId,
+    pub seed: String,
+    pub world_version: String,
+    pub status: LifeStatus,
+    pub figure_picks: Vec<FigurePick>,
+    pub draws: Vec<Draw>,
+    pub checkpoints: Vec<Checkpoint>,
+    pub started_at_ms: u64,
+}
+
+impl LifeView {
+    pub fn from_life(life_id: u64, life: &Life) -> Self {
+        Self {
+            life_id: U64(life_id),
+            account_id: life.account_id.clone(),
+            seed: hex::encode(life.seed),
+            world_version: life.world_version.clone(),
+            status: life.status,
+            figure_picks: life.figure_picks.clone(),
+            draws: life.draws.clone(),
+            checkpoints: life.checkpoints.clone(),
+            started_at_ms: life.started_at_ms,
+        }
+    }
 }
