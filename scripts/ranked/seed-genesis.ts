@@ -1,5 +1,6 @@
 // Plays and mints "genesis" ranked lives on testnet so the NPC draw pools are not empty for the demo.
 //   CONTRACT_ID=everfolk-lives-11101338.testnet COUNT=6 node scripts/ranked/seed-genesis.ts
+//   ACCOUNTS=a.testnet,b.testnet … reuses existing keychain accounts instead of the (rate-limited) faucet.
 // Needs RANKED_VERIFIER_SECRET in .dev.vars (the key registered on the contract). Accounts come from the testnet faucet.
 import { readFileSync } from "node:fs";
 import { buildEvidence } from "../../chain/evidence.ts";
@@ -23,9 +24,11 @@ function chooser(seed: number): (n: number) => number {
   return n => { x ^= x << 13; x ^= x >>> 17; x ^= x << 5; return Math.abs(x) % n; };
 }
 
+const reuse = (process.env.ACCOUNTS ?? "").split(",").map(a => a.trim()).filter(Boolean);
+
 async function genesisLife(index: number, stamp: number): Promise<string> {
-  const account = `genesis-${stamp}-${index}.testnet`;
-  await createFaucetAccount(account);
+  const account = reuse[index - 1] ?? `genesis-${stamp}-${index}.testnet`;
+  if (!reuse[index - 1]) await createFaucetAccount(account);
   const contract = createCliContract(contractId, account);
   const items = new Map<string, string>();
   const session = await startRankedSession({
@@ -49,7 +52,7 @@ async function genesisLife(index: number, stamp: number): Promise<string> {
 
 const stamp = Math.floor(Date.now() / 1000);
 // One life at a time: the public testnet RPC rate-limits parallel signers.
-for (let i = 1; i <= count; i++) {
+for (let i = 1; i <= (reuse.length || count); i++) {
   try {
     console.log(`✓ ${await genesisLife(i, stamp)}`);
   } catch (error) {

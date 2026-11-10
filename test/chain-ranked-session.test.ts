@@ -147,3 +147,24 @@ test("sync rejects a state that does not continue this ranked life", async () =>
   const other = createEngine(world).start("cd".repeat(32));
   await assert.rejects(session.sync(other), /does not continue this ranked life/);
 });
+
+test("beginRankedSession starts a life the entry screen already opened, and resumes it later", async () => {
+  const { beginRankedSession } = await import("../client/chain/ranked-session.ts");
+  const contract = createMockContract({ nobodyWeightBps: 0 });
+  const storage = memoryStorage();
+  const options = { contract, contractId: CONTRACT, verifyUrl: "x", world, storage };
+  const life = await contract.startLife("alexandria-ranked-1");
+  const first = await beginRankedSession(options, life);
+  assert.deepEqual(commandsOf(first)[0], activationCommand(life.figure_picks[0], CONTRACT));
+  await playUntil(first, s => s.state.age >= 6);
+  const again = await beginRankedSession(options, (await contract.getLife(life.life_id))!);
+  assert.equal(again.save(), first.save());
+});
+
+test("beginRankedSession refuses a recorded life with no progress on this device", async () => {
+  const { beginRankedSession } = await import("../client/chain/ranked-session.ts");
+  const { contract, session } = await start();
+  await playUntil(session, s => s.state.age >= 6);
+  const life = (await contract.getLife(session.life.life_id))!;
+  await assert.rejects(beginRankedSession({ contract, contractId: CONTRACT, verifyUrl: "x", world, storage: memoryStorage() }, life), /no saved progress/);
+});

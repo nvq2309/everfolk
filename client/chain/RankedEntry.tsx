@@ -9,7 +9,7 @@ import "./ranked-entry.css";
 export interface RankedEntryProps {
   backend: ChainBackend;
   /** Hands the started life to the ranked session. Absent until the session is wired (Task 17). */
-  onBegin?(life: LifeView): void;
+  onBegin?(life: LifeView): void | Promise<void>;
 }
 
 async function ownersOf(contract: LivesContract, life: LifeView): Promise<OwnersByToken> {
@@ -61,8 +61,8 @@ export default function RankedEntry({ backend, onBegin }: RankedEntryProps) {
 
   function begin() {
     if (!life) return;
-    if (onBegin) onBegin(life);
-    else setNotice("Ranked play isn't open in this build yet. Your place in this world is kept.");
+    if (!onBegin) { setNotice("Ranked play isn't open in this build yet. Your place in this world is kept."); return; }
+    void run(async () => { await onBegin(life); }, "This life could not begin. Try again in a moment.");
   }
 
   return <div className="ranked-entry">

@@ -101,3 +101,12 @@ test("the main API handler routes /api/ranked", async () => {
   assert.equal(response.status, 200);
   assert.equal((await response.json()).contract_id, "lives.testnet");
 });
+
+test("verify still returns signed evidence when evidence storage is unavailable", async () => {
+  const broken = { prepare() { throw new Error("no such table: ranked_evidence"); }, batch: async () => [] } as unknown as RankedEnvironment["DB"];
+  const response = await handleRankedApi(post(verifyBody), env({ DB: broken }), { verifier: async () => fakeVerifier(signed), fetch: rpcReturning(LIFE) });
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.equal(body.signature, signed.signature);
+  assert.equal(body.evidence_stored, false);
+});

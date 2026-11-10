@@ -67,8 +67,8 @@ function ChainShell({ backend, focusKey, onBack, children }: ChainShellProps) {
 export type ChainLayerSession = RankedEndingSession & { state: { phase: string } };
 
 export interface ChainLayerProps {
-  /** Hands a started ranked life to the ranked session (Task 17). */
-  onBeginRanked?(life: LifeView): void;
+  /** Hands a started ranked life to the ranked session; the game then plays it. */
+  onBeginRanked?(life: LifeView, backend: ChainBackend): Promise<void>;
   /** Only a ranked life shows the end-of-life report; free play passes nothing. */
   rankedSession?: ChainLayerSession | null;
   onRankedClosed?(): void;
@@ -86,7 +86,8 @@ export default function ChainLayer({ onBeginRanked, rankedSession, onRankedClose
   }
   if (!route) return null;
   let content: ReactNode = <p className="chain-loading" role="status">Opening the ledger…</p>;
-  if (backend && route.kind === "ranked") content = <RankedEntry backend={backend} onBegin={onBeginRanked} />;
+  const begin = onBeginRanked && backend ? async (life: LifeView) => { await onBeginRanked(life, backend); leaveChainRoute(); } : undefined;
+  if (backend && route.kind === "ranked") content = <RankedEntry backend={backend} onBegin={begin} />;
   if (backend && route.kind === "market") content = <Market backend={backend} />;
   if (backend && route.kind === "token") content = <TokenPage key={route.tokenId} backend={backend} tokenId={route.tokenId} />;
   return <ChainShell backend={backend} focusKey={chainHref(route)} onBack={leaveChainRoute}>{content}</ChainShell>;

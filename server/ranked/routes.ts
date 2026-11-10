@@ -53,14 +53,22 @@ function parseVerifyRequest(text: string): { lifeId: string; saveJson: string; s
 
 async function verify(request: Request, env: RankedEnvironment, deps: RankedDependencies): Promise<Response> {
   const { contractId, rpcUrl } = configured(env);
-  if (!env.DB || !deps.verifier) throw new RouteError(503, "Ranked lives are not set up on this server yet.");
+  if (!deps.verifier) throw new RouteError(503, "Ranked lives are not set up on this server yet.");
   const { lifeId, saveJson, save } = parseVerifyRequest(await readBody(request));
   const life = await viewLife(rpcUrl, contractId, lifeId, deps.fetch ?? fetch);
   if (!life) throw new RouteError(404, "This ranked life was not found on NEAR.");
   const signed = await (await deps.verifier(env)).verify(life, save);
-  await storeEvidence(env.DB, signed.evidence_hash, signed.evidence_json, saveJson, (deps.now ?? (() => new Date()))());
+  // Publishing evidence must never block a mint: the signature alone is what the contract checks.
+  let stored = true;
+  try {
+    if (!env.DB) throw new Error("No evidence database is bound.");
+    await storeEvidence(env.DB, signed.evidence_hash, signed.evidence_json, saveJson, (deps.now ?? (() => new Date()))());
+  } catch (error) {
+    stored = false;
+    console.error("ranked evidence storage failed", { hash: signed.evidence_hash, error: error instanceof Error ? error.message : String(error) });
+  }
   const evidenceUrl = `${new URL(request.url).origin}/api/ranked/evidence/${signed.evidence_hash}`;
-  return json({ ...signed, evidence_url: evidenceUrl });
+  return json({ ...signed, evidence_url: evidenceUrl, evidence_stored: stored });
 }
 
 /** `/api/ranked/*`: public config, life verification and evidence lookup. */

@@ -3,6 +3,7 @@ import { formatYear } from "../src/index.ts";
 import type { LifeState, JournalEntry, WorldPack } from "../src/types.ts";
 import type { WorldRoute } from "../server/content.ts";
 import type { EventVisuals } from "./scene-model.ts";
+import type { RankedPlay } from "./useGame.ts";
 import type { ArchivedLife } from "./session.ts";
 import { engineForLife, exportLife, loadAnyLife, sampleEngine } from "./session.ts";
 import { useGame } from "./useGame.ts";
@@ -122,7 +123,7 @@ function LifeJournal({ life, newestFirst = false }: { life: LifeState; newestFir
   </div>;
 }
 
-function App({ isAdmin = false, onChooseWorld, onNewLife, onImportedLife, worldPickerOpen = false, startFresh = false, startFreshFrom, eventVisuals }: { isAdmin?: boolean; onChooseWorld?: () => void; onNewLife?: (previous: LifeState) => void; onImportedLife?: (life: LifeState) => void; worldPickerOpen?: boolean; startFresh?: boolean; startFreshFrom?: LifeState; worldRoutes?: WorldRoute[]; eventVisuals?: EventVisuals }) {
+function App({ isAdmin = false, onChooseWorld, onNewLife, onImportedLife, worldPickerOpen = false, startFresh = false, startFreshFrom, eventVisuals, ranked }: { isAdmin?: boolean; onChooseWorld?: () => void; onNewLife?: (previous: LifeState) => void; onImportedLife?: (life: LifeState) => void; worldPickerOpen?: boolean; startFresh?: boolean; startFreshFrom?: LifeState; worldRoutes?: WorldRoute[]; eventVisuals?: EventVisuals; ranked?: RankedPlay }) {
   const [panel, setPanel] = useState<"world" | "chronicle" | "sources" | "archive" | "legacy" | "about" | "character" | "wiki" | "map" | null>(null);
   const [characterSection, setCharacterSection] = useState<"career" | "wealth" | "children" | "skills">("career");
   const [restartOpen, setRestartOpen] = useState(false);
@@ -132,7 +133,7 @@ function App({ isAdmin = false, onChooseWorld, onNewLife, onImportedLife, worldP
   const [loanRequest, setLoanRequest] = useState<LoanRequest | null>(null);
   const [loanWarningOpen, setLoanWarningOpen] = useState(false);
   const loanWarningsSeen = useRef(new Set<string>());
-  const game = useGame({ isOverlayOpen: menuOpen || panel !== null || restartOpen || worldPickerOpen || birthPopoverOpen || loanRequest !== null || loanWarningOpen, startFresh, startFreshFrom });
+  const game = useGame({ isOverlayOpen: menuOpen || panel !== null || restartOpen || worldPickerOpen || birthPopoverOpen || loanRequest !== null || loanWarningOpen, startFresh, startFreshFrom, ranked });
   const { life } = game;
   const menuLifeRef = useRef<string | null>(null);
   const lifeEngine = engineForLife(life);

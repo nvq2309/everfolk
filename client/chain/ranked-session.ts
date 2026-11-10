@@ -184,7 +184,19 @@ class Session implements RankedSession {
 
 /** Starts a ranked life: the contract chooses the seed and the figures that shape this world. */
 export async function startRankedSession(options: RankedSessionOptions): Promise<RankedSession> {
-  const life = await options.contract.startLife(RANKED_WORLD_VERSION);
+  return beginRankedSession(options, await options.contract.startLife(RANKED_WORLD_VERSION));
+}
+
+/**
+ * Plays a life that is already open on chain: resumes this device's save, or begins it if nothing has been recorded yet.
+ * A life with on-chain draws or checkpoints but no local save cannot continue here (it would not match its record).
+ */
+export async function beginRankedSession(options: RankedSessionOptions, life: LifeView): Promise<RankedSession> {
+  const saved = (options.storage ?? browserStorage()).getItem(rankedSaveKey(life.life_id));
+  if (saved) return resumeRankedSession(options, life.life_id);
+  if (life.draws.length > 0 || life.checkpoints.length > 0) {
+    throw new Error("This device has no saved progress for this ranked life. Give it up here to start a new one.");
+  }
   const session = new Session(options, life, Session.engineFor(options.world).start(life.seed));
   await session.applyFigures();
   return session;
