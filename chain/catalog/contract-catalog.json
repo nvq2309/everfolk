@@ -3,7 +3,7 @@
     {
       "figure_id": "alexander",
       "title": "Alexander, the conqueror",
-      "media": "",
+      "media": "/assets/figures/alexander.png",
       "supply_cap": 5,
       "action_ids": [
         "alexander.levy",
@@ -13,7 +13,7 @@
     {
       "figure_id": "aristotle",
       "title": "Aristotle, the philosopher",
-      "media": "",
+      "media": "/assets/figures/aristotle.png",
       "supply_cap": 5,
       "action_ids": [
         "aristotle.lyceum",
@@ -23,7 +23,7 @@
     {
       "figure_id": "euclid",
       "title": "Euclid, the geometer",
-      "media": "",
+      "media": "/assets/figures/euclid.png",
       "supply_cap": 5,
       "action_ids": [
         "euclid.school",
@@ -33,7 +33,7 @@
     {
       "figure_id": "cleomenes",
       "title": "Cleomenes of Naucratis, the grain administrator",
-      "media": "",
+      "media": "/assets/figures/cleomenes.png",
       "supply_cap": 5,
       "action_ids": [
         "cleomenes.corner-grain",

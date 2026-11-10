@@ -1,4 +1,4 @@
-import { NPC_ACTIONS } from "../../chain/ids.ts";
+import { NPC_ACTIONS, type FigureId } from "../../chain/ids.ts";
 import type { CareerGroup } from "../../chain/ids.ts";
 import type { Evidence, LifeView, MintResult, SourceImpact } from "../../chain/types.ts";
 import { formatYear } from "../../src/calendar.ts";
@@ -76,6 +76,7 @@ export interface MintRevealView {
   title: string;
   kindLabel: string;
   isFigure: boolean;
+  figureId?: FigureId | null;
   rarityLabel: string;
   affectionText: string;
   href: string;
@@ -88,6 +89,7 @@ export function mintRevealView(result: MintResult, careerGroup: CareerGroup): Mi
     title: isFigure && result.figure_id ? figureTitle(result.figure_id) : GROUP_TITLE[careerGroup],
     kindLabel: KIND_LABEL[isFigure ? "figure" : "npc"],
     isFigure,
+    figureId: isFigure ? result.figure_id : null,
     rarityLabel: rarityLabel(result.rarity),
     affectionText: `Affection ${result.affection} / 100`,
     href: chainHref({ kind: "token", tokenId: result.token_id }),

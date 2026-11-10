@@ -14,6 +14,8 @@ import PauseScreen from "./PauseScreen.tsx";
 import MainMenu from "./MainMenu.tsx";
 import DecisionDialog from "./DecisionDialog.tsx";
 import LifeEventFeed from "./LifeEventFeed.tsx";
+import InfluenceMarkerTag from "./InfluenceMarkerTag.tsx";
+import { influenceMarker } from "./influence-marker.ts";
 import LifeOverview from "./LifeOverview.tsx";
 import LifeMoment from "./LifeMoment.tsx";
 import LifeYearRail from "./LifeYearRail.tsx";
@@ -53,6 +55,8 @@ import "./pixel-theme.css";
 import "./everfolk-ui.css";
 import "./storybook-theme.css";
 import "./readable-type.css";
+import "./creator-tokens.css";
+import "./creator-system.css";
 
 type IconName = "hourglass" | "arrow" | "sun" | "heart" | "book" | "coin" | "bonds" | "pin" | "feather" | "ship" | "home" | "check" | "pause" | "play" | "close" | "download" | "restart";
 
@@ -95,6 +99,7 @@ function journalKind(entry: JournalEntry, world = sampleEngine.world): string {
   if (entry.type === "outcome") return "Outcome";
   if (entry.type === "activity") return "Activity";
   if (entry.type === "birth") return "Background";
+  if (entry.type === "influence") return "Influence";
   if (entry.type === "ending") return world.endings.find(ending => ending.id === entry.id)?.kind === "chapter" ? "Record complete" : "Life ended";
   const event = world.events.find(item => item.id === entry.id);
   if (event?.rarity === "rare") return "Rare encounter";
@@ -125,11 +130,14 @@ function LifeJournal({ life, newestFirst = false }: { life: LifeState; newestFir
     {years.map(group => <section className="journal-year" key={group.age} aria-label={`${formatYear(group.year)}, age ${group.age}`}>
       <header className="journal-year-heading"><h3>{formatYear(group.year)}</h3><span>{group.age === 0 ? "Birth year" : `Age ${group.age}`}</span></header>
       {group.entries.length > 0 ? <ol className="journal-year-entries">
-        {group.entries.map((entry, index) => <li className={`journal-row journal-${entry.type}`} key={`${entry.type}-${entry.id}-${index}`}>
-          <span className="journal-point" aria-hidden="true" /><div className="journal-copy"><span className="journal-kind">{journalKind(entry, world)}</span><p>{displayProse(entry.text)}</p>
+        {group.entries.map((entry, index) => {
+          const marker = influenceMarker(entry, world);
+          return <li className={`journal-row journal-${entry.type}${marker ? ` is-shaped is-${marker.material}` : ""}`} key={`${entry.type}-${entry.id}-${index}`}>
+          <span className="journal-point" aria-hidden="true" /><div className="journal-copy"><span className="journal-kind">{journalKind(entry, world)}</span>{marker && <InfluenceMarkerTag marker={marker} />}<p>{displayProse(entry.text)}</p>
             {journalSourceIds(entry, world).length > 0 && <details className="journal-sources"><summary>Sources</summary><SourceLinks ids={journalSourceIds(entry, world)} world={world} /></details>}
           </div>
-        </li>)}
+        </li>;
+        })}
       </ol> : <p className="journal-quiet-year">This year passed without a recorded event.</p>}
     </section>)}
   </div>;

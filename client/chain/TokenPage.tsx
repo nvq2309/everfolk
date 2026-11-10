@@ -1,3 +1,4 @@
+import FigureArtwork from "./FigureArtwork.tsx";
 import { useEffect, useId, useState } from "react";
 import { errorText, type ChainBackend } from "./chain-backend.ts";
 import { parseNearInput } from "./near-amount.ts";
@@ -66,6 +67,7 @@ export function TokenPageBody({ tokenId, view, busy = false, error, notice, canC
     <section className={`chain-card token-hero${view.isFigure ? " is-figure" : ""}`} aria-labelledby={headingId}>
       <p className="chain-kicker">{view.kindLabel} · No. {tokenId}</p>
       <h1 id={headingId} tabIndex={-1}>{view.title}</h1>
+      <FigureArtwork figureId={view.figureId} />
       <div className="token-tags"><span className={`chain-tag${view.isFigure ? " is-figure" : ""}`}>{view.rarityLabel}</span><span className="chain-tag">{view.lifeLine}</span></div>
       <p className="token-owner">{view.isOwner ? "This life is yours." : `Kept by ${view.owner}`}</p>
       <div className="token-affection"><span>{view.affectionText}</span><span className="life-report-bar" aria-hidden="true"><span style={{ width: `${Math.max(0, Math.min(100, view.affection))}%` }} /></span></div>

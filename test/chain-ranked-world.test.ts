@@ -6,6 +6,7 @@ import keyDecisions from "../chain/catalog/key-decisions.json" with { type: "jso
 import { FIGURES, INFLUENCES, KEY_DECISIONS, keyDecisionCategory } from "../chain/catalog/index.ts";
 import { CATEGORIES, FIGURE_ACTIONS, FIGURE_IDS, NPC_ACTIONS, RANKED_WORLD_VERSION } from "../chain/ids.ts";
 import { buildContractCatalog, buildRankedWorld } from "../chain/ranked-world.ts";
+import { figureMediaUrl } from "../chain/figure-media.ts";
 import { rankedWorldVersion } from "../chain/validate-ranked.ts";
 import { createEngine } from "../src/engine.ts";
 import { canonicalJson } from "../src/random.ts";
@@ -90,10 +91,24 @@ test("contract catalog lists every figure and NPC action", () => {
     const requirement = FIGURES.find(item => item.figure === figure.figure_id)!;
     assert.equal(figure.title, requirement.title);
     assert.equal(figure.supply_cap, requirement.supplyCap);
-    assert.equal(typeof figure.media, "string");
+    assert.equal(figure.media, figureMediaUrl(figure.figure_id as typeof FIGURE_IDS[number]));
+    const png = readFileSync(new URL(`../public${figure.media}`, import.meta.url));
+    assert.equal(png.readUInt32BE(16), 480);
+    assert.equal(png.readUInt32BE(20), 640);
     assert.deepEqual(figure.action_ids, [...FIGURE_ACTIONS[figure.figure_id as keyof typeof FIGURE_ACTIONS]]);
   }
   const expected = Object.entries(NPC_ACTIONS).flatMap(([group, { category, actions }]) =>
     actions.map(action_id => ({ action_id, career_group: group, category })));
   assert.deepEqual(contractCatalog.npc_actions, expected);
+});
+
+// Marketplace metadata needs a public absolute URL when the catalog is published.
+test("figure catalog accepts a public media base and rejects invalid URLs", () => {
+  const published = buildContractCatalog("https://everfolk.example/demo/");
+  for (const figure of published.figures) {
+    assert.equal(figure.media, `https://everfolk.example/demo/assets/figures/${figure.figure_id}.png`);
+  }
+  for (const base of ["/relative", "javascript:alert(1)", "https://example.com/?x=1", "https://user:password@example.com"]) {
+    assert.throws(() => buildContractCatalog(base), /FIGURE_MEDIA_BASE_URL/);
+  }
 });
