@@ -25,6 +25,8 @@ The engine uses a recorded seed and accepted commands for deterministic replay. 
 
 ## Ranked lives on NEAR
 
+**Guides:** [project report](guide/REPORT.md) · [how to play](guide/TUTORIAL.md) · [a real life that became Euclid](guide/EXAMPLE_LIFE.md)
+
 Ordinary play stays offline. A **ranked life** adds NEAR in four places, each one necessary to the game rather than decoration:
 
 1. **A birth nobody can choose.** `start_life` assigns the life's seed from NEAR block randomness and records which famous figures shape that world. The engine is deterministic, so the seed plus the player's choices *is* the life.
