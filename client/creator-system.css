@@ -1,0 +1,30 @@
+/* Character-creator system applied over the storybook theme. Loaded after
+   storybook-theme.css and readable-type.css, so these rules settle the
+   cascade for the panels below. Tokens: creator-tokens.css. */
+
+/* 01 · Skill paths (dashboard and sidebar) */
+.compact-skills .compact-skill-branch h4,.life-info-sidebar .compact-skills .compact-skill-branch h4,.game-dashboard .dashboard-skills .compact-skill-branch h4{display:flex;align-items:center;gap:8px;font-size:10px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:var(--cr-ink);margin:0 0 9px}
+.compact-skills .compact-skill-path{gap:6px}
+.game-dashboard .compact-skills .compact-skill-node,.life-info-sidebar .compact-skills .compact-skill-node,.compact-skills .compact-skill-node{border:1px solid var(--cr-wood-1);background:var(--cr-paper);box-shadow:inset 0 0 0 2px var(--cr-paper),inset 0 0 0 3px var(--cr-linen-2),2px 2px 0 #d4c39a;color:var(--cr-ink);border-radius:0;padding:8px 9px}
+.compact-skills .compact-skill-node.is-locked{border-style:dashed;border-color:var(--cr-linen-0);background:var(--cr-linen-wash);box-shadow:none;color:#6e6450}
+.compact-skills .compact-skill-node.is-learning{border-color:var(--cr-faience-0);background:var(--cr-faience-wash);box-shadow:inset 0 0 0 2px var(--cr-faience-wash),inset 0 0 0 3px var(--cr-faience-2),2px 2px 0 #a9c7b5}
+.compact-skills .compact-skill-node.is-mastered{border-color:var(--cr-gold-0);background:var(--cr-gold-wash);box-shadow:inset 0 0 0 2px var(--cr-gold-wash),inset 0 0 0 3px var(--cr-gold-2),2px 2px 0 #d6b874}
+.compact-skills .compact-skill-node.is-highlighted{border:1px solid var(--cr-olive);background:var(--cr-olive-wash);box-shadow:inset 3px 0 var(--cr-olive),inset 0 0 0 1px var(--cr-olive-ring),2px 2px 0 #91a47555}
+.compact-skills .compact-skill-name strong{font-weight:700}
+.compact-skills .compact-skill-node meter{height:5px;border:1px solid var(--cr-linen-0);background:var(--cr-paper);border-radius:0}
+.compact-skills .compact-skill-node meter::-webkit-meter-bar{background:var(--cr-paper);height:3px;border-radius:0}
+.compact-skills .compact-skill-node meter::-webkit-meter-optimum-value{background:var(--cr-wood-1)}
+.compact-skills .compact-skill-node meter::-moz-meter-bar{background:var(--cr-wood-1)}
+.compact-skills .compact-skill-node.is-learning meter{border-color:var(--cr-faience-0)}
+.compact-skills .compact-skill-node.is-learning meter::-webkit-meter-optimum-value{background:var(--cr-faience-1)}
+.compact-skills .compact-skill-node.is-learning meter::-moz-meter-bar{background:var(--cr-faience-1)}
+.compact-skills .compact-skill-node.is-mastered meter{border-color:var(--cr-gold-0)}
+.compact-skills .compact-skill-node.is-mastered meter::-webkit-meter-optimum-value{background:var(--cr-gold-1)}
+.compact-skills .compact-skill-node.is-mastered meter::-moz-meter-bar{background:var(--cr-gold-1)}
+.compact-skills .compact-skill-state{color:var(--cr-wood-0)}
+.compact-skills .compact-skill-state>span:first-child{display:inline-flex;align-items:center;gap:4px;text-transform:capitalize;font-weight:600}
+.compact-skills .is-locked .compact-skill-state{color:#6e6450}
+.compact-skills .is-learning .compact-skill-state{color:var(--cr-faience-0)}
+.compact-skills .is-mastered .compact-skill-state{color:var(--cr-gold-0)}
+.compact-skills .compact-branch-selector select,.life-info-sidebar .compact-branch-selector select{border:1px solid var(--cr-edge);background:#fffdf4;border-radius:0}
+.compact-skills .compact-branch-selector select:focus-visible,.compact-skills button:focus-visible{outline:3px solid #648473;outline-offset:3px}

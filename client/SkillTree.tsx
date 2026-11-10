@@ -9,8 +9,10 @@ import type { SkillNode, SkillRequirement } from "./skill-tree.ts";
 import { layoutSkillLinks } from "./skill-tree-links.ts";
 import { activityLoanOffer } from "./loan-access.ts";
 import SkillGrowth from "./SkillGrowth.tsx";
+import SkillStateGlyph from "./SkillStateGlyph.tsx";
 import LateSkillRoutes from "./LateSkillRoutes.tsx";
 import { formatSkillValue as skillNumber } from "./skill-growth.ts";
+import "./creator-tokens.css";
 import "./skill-tree.css";
 
 function SkillIcon({ id }: { id: string }) {
@@ -134,14 +136,14 @@ export default function SkillTree({ life, world, activities, onActivity, initial
     <div className="skill-tree-heading"><div><span className="skill-tree-eyebrow">{wiki ? "Reference" : "Training"}</span><h3>{wiki ? "All skill paths" : "Your skills"}</h3><p>{wiki ? "Explore every skill, including future paths and their requirements." : "Learned skills and paths you have unlocked."}</p><button type="button" className="skill-wiki-link" onClick={() => setView(wiki ? "current" : "wiki")}>{wiki ? "Your skills" : "Skill wiki"} <span aria-hidden="true">↗</span></button></div><div className="skill-tree-tally"><strong>{started}<span> / {model.nodes.length}</span></strong><span>skills learned{mastered > 0 ? ` · ${mastered} mastered` : ""}</span></div></div>
     <div className="skill-tree-toolbar">
       <div className="skill-tree-search"><label htmlFor={`${instanceId}-search`}>Find a skill</label><input id={`${instanceId}-search`} type="search" value={search} onChange={event => setSearch(event.target.value)} placeholder="Try pottery or astronomy" autoComplete="off" /></div>
-      <div className="skill-tree-legend" aria-label="Skill states">{model.nodes.some(node => node.state === "locked") && <span className="is-locked">Locked</span>}<span className="is-ready">Ready</span><span className="is-learning">Learning</span><span className="is-mastered">Mastered</span></div>
+      <div className="skill-tree-legend" aria-label="Skill states">{model.nodes.some(node => node.state === "locked") && <span className="is-locked"><SkillStateGlyph state="locked" />Locked</span>}<span className="is-ready"><SkillStateGlyph state="ready" />Ready</span><span className="is-learning"><SkillStateGlyph state="learning" />Learning</span><span className="is-mastered"><SkillStateGlyph state="mastered" />Mastered</span></div>
     </div>
     <p className="skill-tree-map-note" id={`${instanceId}-map-help`}>{query ? `${matchCount} matching ${matchCount === 1 ? "skill" : "skills"}. All paths remain visible.` : "Follow each path from left to right. Green links show requirements you have met."} <span>Select a skill to highlight its connections. Use arrow keys to explore.</span></p>
     <div className="skill-tree-layout">
       <div className="skill-tree-map-wrap"><div className="skill-tree-scroll" tabIndex={0} role="region" aria-label="Skill tree map, scroll horizontally to explore" aria-describedby={`${instanceId}-map-help`}>
         <div className="skill-tree-board" style={{ width: layout.width, height: layout.height }}>
           {layout.tierX.map((left, tier) => <span key={tier} className="skill-tree-tier" style={{ left, width: layout.cardWidth }}>{tier === 0 ? "Basic" : tier === 1 ? "Intermediate" : tier === 2 ? "Advanced" : `Tier ${tier + 1}`}</span>)}
-          {layout.branches.map((branch, index) => <div key={branch.label} className={`skill-tree-branch skill-branch-${index % 4}`} style={{ top: branch.y, height: branch.height, width: layout.width }}><span>{branch.label}</span></div>)}
+          {layout.branches.map((branch, index) => <div key={branch.label} className={`skill-tree-branch skill-branch-${index % 4}`} style={{ top: branch.y, height: branch.height, width: layout.width }}><span><span className="cr-index" aria-hidden="true">{String(index + 1).padStart(2, "0")}</span><span className="skill-branch-name">{branch.label}</span></span></div>)}
           <svg className="skill-tree-connectors" width={layout.width} height={layout.height} viewBox={`0 0 ${layout.width} ${layout.height}`} aria-hidden="true">
             <defs><marker id={`${instanceId}-arrow`} viewBox="0 0 6 6" refX="5" refY="3" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0 0 6 3 0 6z" fill="context-stroke" /></marker></defs>
             {links.map(edge => {
@@ -159,13 +161,13 @@ export default function SkillTree({ life, world, activities, onActivity, initial
               onClick={() => select(node.id)} onKeyDown={event => navigate(event, node)}>
               <span className="skill-node-heading"><span className="skill-node-icon"><SkillIcon id={node.id} /></span><span className="skill-node-name">{node.label}</span></span>
               <span className="skill-node-progress" aria-hidden="true"><span style={{ width: `${node.progress * 100}%` }} /></span>
-              <span className="skill-node-bottom"><span className="skill-node-state">{node.state === "locked" && <svg viewBox="0 0 10 12" width="7" height="9" fill="none" stroke="currentColor" strokeWidth="1.2" aria-hidden="true"><rect x="1" y="5" width="8" height="6" rx="1" /><path d="M3 5V3a2 2 0 0 1 4 0v2" /></svg>}{node.state}</span><span className="skill-node-value">{skillNumber(node.value, node.max)}<small> / {node.max}</small></span></span>
+              <span className="skill-node-bottom"><span className="skill-node-state"><SkillStateGlyph state={node.state} />{node.state}</span><span className="skill-node-value">{skillNumber(node.value, node.max)}<small> / {node.max}</small></span></span>
             </button>;
           })}
         </div>
       </div><p className="skill-tree-scroll-hint">Follow each branch from left to right <span aria-hidden="true">→</span></p></div>
       <aside className={`skill-tree-detail is-${selected.state}`} id={`${instanceId}-detail`} aria-label={`${selected.label} details`}>
-        <div className="skill-detail-title"><span className="skill-detail-icon"><SkillIcon id={selected.id} /></span><div><span className="skill-detail-branch">{selected.branch}</span><h4>{selected.label}</h4></div><span className="skill-detail-state">{selected.state}</span></div>
+        <div className="skill-detail-title"><span className="skill-detail-icon"><SkillIcon id={selected.id} /></span><div><span className="skill-detail-branch">{selected.branch}</span><h4>{selected.label}</h4></div><span className="skill-detail-state"><SkillStateGlyph state={selected.state} />{selected.state}</span></div>
         <p className="skill-detail-description">{displayProse(selected.description)}</p>
         <div className="skill-detail-proficiency"><label htmlFor={`${instanceId}-proficiency`}>Proficiency <strong>{skillNumber(selected.value, selected.max)}<span> / {selected.max}</span></strong></label><meter id={`${instanceId}-proficiency`} min={selected.min} max={selected.max} value={selected.value} /></div>
         <SkillGrowth life={life} world={world} skillId={selected.id} />
