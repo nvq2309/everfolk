@@ -1,5 +1,6 @@
 /* Ranked screens: full-page paper sheet over the game, in the pixel theme. */
-.chain-screen{position:fixed;inset:0;z-index:60;overflow-y:auto;background:var(--paper,#f4e7c9);color:var(--ink,#263b43);padding:24px 32px 40px}
+dialog.chain-screen{position:fixed;inset:0;z-index:60;width:100%;height:100%;max-width:none;max-height:none;margin:0;border:0;overflow-y:auto;background:var(--paper,#f4e7c9);color:var(--ink,#263b43);padding:24px 32px 40px}
+dialog.chain-screen::backdrop{background:var(--paper,#f4e7c9)}
 .chain-shell{width:min(880px,100%);margin:0 auto}
 .chain-topline{display:flex;align-items:center;flex-wrap:wrap;gap:10px 20px;padding-bottom:16px;margin-bottom:24px;border-bottom:2px solid #c5aa79;font-size:11px}
 .chain-topline a{color:#41637b;text-decoration:none}
@@ -30,5 +31,5 @@
 .chain-field{display:grid;gap:6px;font-size:11px;color:#5d6150}
 .chain-field input,.chain-field select{min-height:42px;min-width:0;width:100%;padding:8px 10px;border:2px solid #baa47a;background:#fbf5e4;color:#263b43;font:13px "DM Sans","Segoe UI",sans-serif}
 .chain-screen a:focus-visible,.chain-screen button:focus-visible,.chain-screen input:focus-visible,.chain-screen select:focus-visible{outline:2px solid #41637b;outline-offset:3px}
-@media(max-width:600px){.chain-screen{padding:16px 14px 32px}.chain-card{padding:18px 16px}.chain-actions>button{flex:1 1 100%}}
-@media(max-width:360px){.chain-screen{padding:12px 10px 28px}.chain-card{padding:16px 12px;box-shadow:3px 3px 0 #88644725}.chain-topline nav{margin-left:0}}
+@media(max-width:600px){dialog.chain-screen{padding:16px 14px 32px}.chain-card{padding:18px 16px}.chain-actions>button{flex:1 1 100%}}
+@media(max-width:360px){dialog.chain-screen{padding:12px 10px 28px}.chain-card{padding:16px 12px;box-shadow:3px 3px 0 #88644725}.chain-topline nav{margin-left:0}}

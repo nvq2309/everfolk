@@ -7,6 +7,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import ts from "typescript";
 import type { LifeView } from "../chain/types.ts";
 import { lifeReport, mintRevealView, npcActionMenu } from "../client/chain/life-report-model.ts";
+import { tokenPageView } from "../client/chain/token-page-model.ts";
 
 const hooks = registerHooks({
   load(url, context, nextLoad) {
@@ -21,6 +22,8 @@ const { default: BornInto } = await import("../client/chain/BornInto.tsx");
 const { default: DrawBeat } = await import("../client/chain/DrawBeat.tsx");
 const { default: LifeReport } = await import("../client/chain/LifeReport.tsx");
 const { default: MintReveal } = await import("../client/chain/MintReveal.tsx");
+const { TokenPageBody } = await import("../client/chain/TokenPage.tsx");
+const { MarketBody } = await import("../client/chain/Market.tsx");
 hooks.deregister();
 
 const noop = () => {};
@@ -63,4 +66,30 @@ test("reveal names the kept life with rarity and affection", () => {
   assert.match(html, /Epic/);
   assert.match(html, /Affection 80 \/ 100/);
   assert.match(html, /href="#token\/9"/);
+});
+
+test("token page shows reach, claim and owner controls only to the owner", () => {
+  const token = { owner_id: "alice.testnet", extra: {
+    kind: "npc" as const, figure_id: null, rarity: 1, affection: 70, action_id: "letters.teach", life_id: "4", birth_year: -350, death_year: -289,
+    career_group: "letters" as const, sources: [{ token_id: "1", bps: 10_000 }], evidence_hash: "e".repeat(64),
+  } };
+  const half = (10n ** 24n / 2n).toString();
+  const input = { tokenId: "5", token, stats: { lives_influenced: 2, earned: half }, balance: half, listing: null, children: ["9"], sourceTokens: {} };
+  const handlers = { onSetAction: noop, onWithdraw: noop, onList: noop, onUnlist: noop, onBuy: noop };
+  const owner = renderToStaticMarkup(createElement(TokenPageBody, { tokenId: "5", view: tokenPageView({ ...input, viewer: "alice.testnet" }), ...handlers }));
+  assert.match(owner, /Affected 2 lives · earned 0\.5 NEAR/);
+  assert.match(owner, /Withdraw/);
+  assert.match(owner, /Make this its deed/);
+  assert.match(owner, /Put it up for sale/);
+  const visitor = renderToStaticMarkup(createElement(TokenPageBody, { tokenId: "5", view: tokenPageView({ ...input, viewer: "carol.testnet" }), ...handlers }));
+  assert.doesNotMatch(visitor, /Withdraw|Make this its deed|Put it up for sale/);
+  assert.match(visitor, /Kept by alice\.testnet/);
+});
+
+test("market lists offers with a buy button for others", () => {
+  const row = { tokenId: "5", href: "#token/5", title: "Scholar of Alexandria", isFigure: false, rarityLabel: "Common", actionName: "Teach the young", seller: "alice.testnet", priceText: "2 NEAR", priceYocto: "2", canBuy: true };
+  const html = renderToStaticMarkup(createElement(MarketBody, { rows: [row], onBuy: noop }));
+  assert.match(html, /Scholar of Alexandria/);
+  assert.match(html, />Buy</);
+  assert.match(renderToStaticMarkup(createElement(MarketBody, { rows: [], onBuy: noop })), /Nothing is for sale right now/);
 });

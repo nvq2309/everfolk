@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { RANKED_WORLD_VERSION } from "../../chain/ids.ts";
 import { parseRankedConfig, type RankedAvailability, type RankedConfig } from "./born-into-model.ts";
 import { resolveChainConfig, type ChainConfig } from "./config.ts";
@@ -82,7 +82,7 @@ export function useChainBackend(): ChainBackend | null {
     void createBackend(account => { if (!cancelled) setAccountId(account); }).then(backend => { if (!cancelled) setBase(backend); });
     return () => { cancelled = true; };
   }, []);
-  return base ? { ...base, accountId } : null;
+  return useMemo(() => (base ? { ...base, accountId } : null), [base, accountId]);
 }
 
 export function errorText(cause: unknown, fallback: string): string {
