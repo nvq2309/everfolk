@@ -55893,34 +55893,34 @@
     },
     {
       "id": "cleomenes.granaries",
-      "label": "Cleomenes fills the granaries: rations reach struggling households in a lean season.",
+      "label": "Cleomenes fills the granaries: rations reach households weakened in the famine years.",
       "baseWeight": 3,
       "event": {
         "id": "influence-cleomenes-granaries",
         "title": "The granaries open",
-        "text": "In a lean season, officials open the royal granaries that Cleomenes had filled and issue measured rations in your district. Clerks write each household's name against its share.",
+        "text": "The grain shortage that has struck the Greek cities reaches your district, and you are already weak. Officials open the royal granaries that Cleomenes had filled and issue measured rations. Clerks write each household's name against its share.",
         "trigger": {
-          "type": "age",
-          "at": 1
+          "type": "year",
+          "at": -331
         },
         "when": {
           "type": "all",
           "conditions": [
             {
-              "type": "age",
-              "op": "gte",
-              "value": 1
+              "type": "flag",
+              "flag": "alexandria-founded",
+              "value": true
             },
             {
-              "type": "age",
-              "op": "lte",
-              "value": 59
+              "type": "flag",
+              "flag": "ptolemy-governs-egypt",
+              "value": false
             },
             {
               "type": "stat",
               "stat": "health",
               "op": "lte",
-              "value": 35
+              "value": 45
             }
           ]
         },

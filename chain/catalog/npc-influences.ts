@@ -2,8 +2,9 @@ import type { InfluenceEntry } from "./influence-entry.ts";
 import { flag, skill, stat } from "./content.ts";
 
 /**
- * NPC actions are applied at a key decision. Stat deltas scale with the source's
- * rarity power (rounded toward zero); skill and flag effects apply as written.
+ * NPC actions are applied at a key decision. Stat and skill deltas (like cash and
+ * debt) scale with the source's rarity power, rounded toward zero; flag effects
+ * apply as written.
  * Base weight 3 marks the larger action in a menu, 1 the smaller one.
  */
 export const NPC_INFLUENCES: readonly InfluenceEntry[] = [
